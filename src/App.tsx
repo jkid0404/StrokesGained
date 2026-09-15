@@ -1,0 +1,1322 @@
+import { useCallback, useEffect, useState } from 'react'
+import './App.css'
+import {
+  BENCHMARK_VERSION,
+  LIE_LABELS,
+  benchmarkRange,
+  buildCourseTemplates,
+  buildHoleSequence,
+  buildPersonalBaseline,
+  calculateCumulativeMetrics,
+  calculateRound,
+  calculateShot,
+  courseKey,
+  createId,
+  excludeDeletedCourseTemplates,
+  formatMetric,
+  mergeCourseTemplates,
+  type CourseTemplate,
+  type Hole,
+  type Lie,
+  type Position,
+  type Round,
+  type ShotCategory,
+} from './domain'
+import {
+  loadCourses,
+  loadDeletedCourseKeys,
+  loadRounds,
+  saveCourses,
+  saveDeletedCourseKeys,
+  saveRounds,
+} from './storage'
+import type { LocalState } from './cloudState'
+import { useCloudSync } from './useCloudSync'
+
+type View = 'home' | 'setup' | 'entry' | 'results' | 'courses' | 'course-edit'
+
+const CATEGORY_LABELS: Record<ShotCategory, string> = {
+  'off-the-tee': 'Off the tee',
+  approach: 'Approach',
+  'around-the-green': 'Around green',
+  putting: 'Putting',
+}
+
+const PLAYABLE_LIES: Lie[] = ['fairway', 'rough', 'sand', 'recovery', 'green', 'holed']
+
+function App() {
+  const [rounds, setRounds] = useState<Round[]>(loadRounds)
+  const [courses, setCourses] = useState<CourseTemplate[]>(() =>
+    excludeDeletedCourseTemplates(
+      mergeCourseTemplates(buildCourseTemplates(loadRounds()), loadCourses()),
+      loadDeletedCourseKeys(),
+    ),
+  )
+  const [deletedCourseKeys, setDeletedCourseKeys] = useState<string[]>(loadDeletedCourseKeys)
+  const [view, setView] = useState<View>('home')
+  const [activeRoundId, setActiveRoundId] = useState<string | null>(null)
+  const [activeHoleIndex, setActiveHoleIndex] = useState(0)
+  const [activeCourseKey, setActiveCourseKey] = useState<string | null>(null)
+
+  useEffect(() => saveRounds(rounds), [rounds])
+  useEffect(() => saveCourses(courses), [courses])
+  useEffect(() => saveDeletedCourseKeys(deletedCourseKeys), [deletedCourseKeys])
+
+  const applyCloudState = useCallback((state: LocalState) => {
+    setRounds(state.rounds)
+    setCourses(state.courses)
+    setDeletedCourseKeys(state.deletedCourseKeys)
+    setActiveRoundId(null)
+    setActiveCourseKey(null)
+    setView('home')
+  }, [])
+
+  const cloud = useCloudSync({
+    localState: { rounds, courses, deletedCourseKeys },
+    applyState: applyCloudState,
+  })
+
+  const activeRound = rounds.find((round) => round.id === activeRoundId) ?? null
+  const roundsSelected = view === 'home' || view === 'entry' || view === 'results'
+  const coursesSelected = view === 'courses' || view === 'course-edit'
+
+  function upsertRound(round: Round) {
+    setRounds((current) => {
+      const exists = current.some((item) => item.id === round.id)
+      return exists
+        ? current.map((item) => (item.id === round.id ? round : item))
+        : [round, ...current]
+    })
+  }
+
+  function startRound(round: Round) {
+    upsertRound(round)
+    const teeName = round.teeName?.trim() || 'Unspecified tees'
+    const key = courseKey(round.courseName, teeName)
+    setDeletedCourseKeys((keys) => keys.filter((deletedKey) => deletedKey !== key))
+    setCourses((current) => {
+      return current.some((course) => course.key === key)
+        ? current
+        : [...current, { key, name: round.courseName, teeName, holes: {} }].sort(
+            (a, b) => a.name.localeCompare(b.name),
+          )
+    })
+    setActiveRoundId(round.id)
+    const firstIncomplete = round.holes.findIndex(
+      (hole) => hole.shots.at(-1)?.finish.lie !== 'holed',
+    )
+    setActiveHoleIndex(firstIncomplete === -1 ? round.holes.length - 1 : firstIncomplete)
+    setView('entry')
+  }
+
+  function updateCourseHole(courseName: string, teeName: string, hole: Hole) {
+    const key = courseKey(courseName, teeName)
+    setDeletedCourseKeys((keys) => keys.filter((deletedKey) => deletedKey !== key))
+    setCourses((current) => {
+      const existing = current.find((course) => course.key === key)
+      const updated: CourseTemplate = {
+        key,
+        name: existing?.name ?? courseName,
+        teeName: existing?.teeName ?? teeName,
+        holes: {
+          ...(existing?.holes ?? {}),
+          [hole.number]: { par: hole.par, yardage: hole.yardage },
+        },
+      }
+      return [...current.filter((course) => course.key !== key), updated].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      )
+    })
+  }
+
+  function saveCourse(course: CourseTemplate, originalKey: string) {
+    setCourses((current) =>
+      [...current.filter((item) => item.key !== originalKey && item.key !== course.key), course].sort(
+        (a, b) => a.name.localeCompare(b.name),
+      ),
+    )
+    setDeletedCourseKeys((keys) => [
+      ...keys.filter((key) => key !== course.key && key !== originalKey),
+      ...(course.key === originalKey ? [] : [originalKey]),
+    ])
+    setActiveCourseKey(course.key)
+    setView('courses')
+  }
+
+  function deleteCourse(course: CourseTemplate) {
+    const confirmed = window.confirm(
+      `Delete ${course.name} — ${course.teeName}? Historical rounds will not be changed.`,
+    )
+    if (!confirmed) return
+
+    setCourses((current) => current.filter((item) => item.key !== course.key))
+    setDeletedCourseKeys((keys) =>
+      keys.includes(course.key) ? keys : [...keys, course.key],
+    )
+    if (activeCourseKey === course.key) setActiveCourseKey(null)
+  }
+
+  if (!cloud.canUseApp) {
+    return (
+      <div className="app-shell">
+        <header className="app-header">
+          <div className="brand" aria-label="Strokes Gained">
+            <span className="brand-mark">SG</span>
+            <span>
+              <strong>Strokes Gained</strong>
+            </span>
+          </div>
+        </header>
+        <main>
+          <AuthGate
+            authMode={cloud.authMode}
+            userDetails={cloud.principal?.userDetails ?? null}
+          />
+        </main>
+      </div>
+    )
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="app-header">
+        <button className="brand" onClick={() => setView('home')} type="button">
+          <span className="brand-mark">SG</span>
+          <span>
+            <strong>Strokes Gained</strong>
+          </span>
+        </button>
+        <div className="header-controls">
+          <nav aria-label="Primary navigation">
+            <button
+              className={`nav-button ${roundsSelected ? 'active' : ''}`}
+              type="button"
+              onClick={() => setView('home')}
+            >
+              Rounds
+            </button>
+            <button
+              className={`nav-button ${coursesSelected ? 'active' : ''}`}
+              type="button"
+              onClick={() => setView('courses')}
+            >
+              Courses
+            </button>
+            <button
+              className={`nav-button new-round ${view === 'setup' ? 'active' : ''}`}
+              type="button"
+              onClick={() => setView('setup')}
+            >
+              New round
+            </button>
+          </nav>
+          <CloudStatus
+            authMode={cloud.authMode}
+            status={cloud.syncStatus}
+            message={cloud.syncMessage}
+            userDetails={cloud.principal?.userDetails ?? null}
+          />
+        </div>
+      </header>
+
+      <main>
+        {cloud.syncStatus === 'conflict' && (
+          <div className="sync-conflict" role="alert">
+            <div>
+              <strong>Cloud data changed on another device.</strong>
+              <span>Your local changes were not uploaded.</span>
+            </div>
+            <button className="secondary compact" type="button" onClick={cloud.reloadCloudData}>
+              Reload cloud data
+            </button>
+          </div>
+        )}
+        {view === 'home' && (
+          <Home
+            rounds={rounds}
+            onNew={() => setView('setup')}
+            onOpen={(round) => {
+              const firstIncomplete = round.holes.findIndex(
+                (hole) => hole.shots.at(-1)?.finish.lie !== 'holed',
+              )
+              setActiveRoundId(round.id)
+              setActiveHoleIndex(firstIncomplete === -1 ? 0 : firstIncomplete)
+              setView(round.status === 'complete' ? 'results' : 'entry')
+            }}
+          />
+        )}
+        {view === 'setup' && (
+          <RoundSetup
+            courses={courses}
+            onStart={startRound}
+            onCancel={() => setView('home')}
+          />
+        )}
+        {view === 'entry' && activeRound && (
+          <RoundEntry
+            key={`${activeRound.id}-${activeHoleIndex}-${activeRound.holes[activeHoleIndex]?.shots.length ?? 0}`}
+            round={activeRound}
+            activeHoleIndex={Math.max(0, activeHoleIndex)}
+            onHoleChange={setActiveHoleIndex}
+            onChange={upsertRound}
+            onHoleDetailsChange={updateCourseHole}
+            onFinish={(round) => {
+              upsertRound({ ...round, status: 'complete' })
+              setView('results')
+            }}
+          />
+        )}
+        {view === 'results' && activeRound && (
+          <Results
+            round={activeRound}
+            allRounds={rounds}
+            onBack={() => setView('home')}
+            onEdit={() => {
+              setActiveHoleIndex(0)
+              setView('entry')
+            }}
+          />
+        )}
+        {view === 'courses' && (
+          <CourseLibrary
+            courses={courses}
+            onBack={() => setView('home')}
+            onDelete={deleteCourse}
+            onEdit={(course) => {
+              setActiveCourseKey(course.key)
+              setView('course-edit')
+            }}
+          />
+        )}
+        {view === 'course-edit' && activeCourseKey && (
+          <CourseEditor
+            course={courses.find((course) => course.key === activeCourseKey)}
+            onCancel={() => setView('courses')}
+            onSave={(course) => saveCourse(course, activeCourseKey)}
+          />
+        )}
+      </main>
+    </div>
+  )
+}
+
+function AuthGate({
+  authMode,
+  userDetails,
+}: {
+  authMode: 'checking' | 'local' | 'signed-out' | 'signed-in' | 'denied'
+  userDetails: string | null
+}) {
+  const loading = authMode === 'checking' || authMode === 'signed-in'
+
+  return (
+    <section className="auth-page">
+      <div className="auth-card">
+        <span className="brand-mark large">SG</span>
+        {loading ? (
+          <>
+            <span className="eyebrow">Secure cloud storage</span>
+            <h1>Loading your golf data…</h1>
+            <p>Checking Microsoft sign-in and synchronizing this device.</p>
+          </>
+        ) : authMode === 'denied' ? (
+          <>
+            <span className="eyebrow">Access restricted</span>
+            <h1>This Microsoft account is not allowed.</h1>
+            <p>
+              {userDetails
+                ? `${userDetails} is signed in, but it does not match the configured allowlist.`
+                : 'The signed-in account does not match the configured allowlist.'}
+            </p>
+            <a className="secondary auth-link" href="/.auth/logout?post_logout_redirect_uri=/">
+              Sign out
+            </a>
+          </>
+        ) : (
+          <>
+            <span className="eyebrow">Private cross-device sync</span>
+            <h1>Sign in to see your rounds.</h1>
+            <p>
+              Microsoft authentication protects your cloud data. Existing data on this device
+              will be uploaded after your first sign-in if the cloud is empty.
+            </p>
+            <a className="primary auth-link" href="/.auth/login/aad?post_login_redirect_uri=/">
+              Sign in with Microsoft
+            </a>
+          </>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function CloudStatus({
+  authMode,
+  status,
+  message,
+  userDetails,
+}: {
+  authMode: 'checking' | 'local' | 'signed-out' | 'signed-in' | 'denied'
+  status: string
+  message: string
+  userDetails: string | null
+}) {
+  if (authMode === 'local') {
+    return (
+      <div className="cloud-status local" title="Static Web Apps authentication is unavailable">
+        <span className="status-dot" />
+        <span>Local only</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="cloud-account">
+      <div className={`cloud-status ${status}`} title={userDetails ?? message}>
+        <span className="status-dot" />
+        <span>{message}</span>
+      </div>
+      <a
+        className="text-button sign-out-link"
+        href="/.auth/logout?post_logout_redirect_uri=/"
+      >
+        Sign out
+      </a>
+    </div>
+  )
+}
+
+function Home({
+  rounds,
+  onNew,
+  onOpen,
+}: {
+  rounds: Round[]
+  onNew: () => void
+  onOpen: (round: Round) => void
+}) {
+  const cumulative = calculateCumulativeMetrics(rounds)
+
+  return (
+    <section className="page">
+      <div className="hero-card">
+        <div className="hero-overview">
+          <span className="eyebrow">All completed rounds</span>
+          <h1>Cumulative strokes gained</h1>
+          <p>
+            A running view of your performance against the PGA tour and your own
+            established form.
+          </p>
+        </div>
+        <div className="hero-metric-grid">
+          <HeroMetric
+            label="Vs PGA Tour average"
+            value={cumulative.versusPgaTour}
+            detail={`${cumulative.pgaRoundCount} completed round${
+              cumulative.pgaRoundCount === 1 ? '' : 's'
+            }`}
+          />
+          <HeroMetric
+            label="Vs your average"
+            value={cumulative.versusPersonalAverage}
+            detail={
+              cumulative.personalRoundCount
+                ? `${cumulative.personalRoundCount} round${
+                    cumulative.personalRoundCount === 1 ? '' : 's'
+                  } with a prior baseline`
+                : 'Available after 5 prior eligible rounds'
+            }
+          />
+        </div>
+      </div>
+
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Round history</span>
+          <h2>Your rounds</h2>
+        </div>
+        <span className="pill">{rounds.length} saved</span>
+      </div>
+
+      {rounds.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">⛳</div>
+          <h3>No rounds yet</h3>
+          <p>Create a round, enter each finishing position, and the app will build the shot chain.</p>
+          <button className="primary" type="button" onClick={onNew}>
+            Create first round
+          </button>
+        </div>
+      ) : (
+        <div className="round-list">
+          {rounds.map((round) => {
+            const metrics = calculateRound(round)
+            return (
+              <button className="round-row" key={round.id} type="button" onClick={() => onOpen(round)}>
+                <span>
+                  <strong>{round.courseName}</strong>
+                  <small>
+                    {round.playedOn} · {metrics.completedHoles}/{round.holes.length} holes
+                  </small>
+                </span>
+                <span className="round-score">
+                  <strong
+                    className={
+                      metrics.strokesGainedPer18 === null
+                        ? 'neutral-metric'
+                        : metrics.strokesGainedPer18 >= 0
+                          ? 'positive'
+                          : 'negative'
+                    }
+                  >
+                    {formatMetric(metrics.strokesGainedPer18)}
+                  </strong>
+                  <small>{round.status === 'draft' ? 'Draft' : 'SG / 18'}</small>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function HeroMetric({
+  label,
+  value,
+  detail,
+}: {
+  label: string
+  value: number | null
+  detail: string
+}) {
+  const tone = value === null ? 'neutral' : value >= 0 ? 'gain' : 'loss'
+  return (
+    <div className="hero-stat">
+      <span>{label}</span>
+      <strong className={tone}>{value === null ? '—' : formatMetric(value)}</strong>
+      <small>{detail}</small>
+    </div>
+  )
+}
+
+function RoundSetup({
+  courses,
+  onStart,
+  onCancel,
+}: {
+  courses: CourseTemplate[]
+  onStart: (round: Round) => void
+  onCancel: () => void
+}) {
+  const [selectedCourseKey, setSelectedCourseKey] = useState('')
+  const [courseName, setCourseName] = useState('')
+  const [teeName, setTeeName] = useState('')
+  const [playedOn, setPlayedOn] = useState(new Date().toISOString().slice(0, 10))
+  const [holeCount, setHoleCount] = useState<9 | 18>(9)
+  const [startingHole, setStartingHole] = useState(1)
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault()
+    const selectedTemplate = courses.find(
+      (template) => template.key === selectedCourseKey,
+    )
+    const holes = buildHoleSequence(holeCount, startingHole).map((hole) => {
+      const savedHole = selectedTemplate?.holes[hole.number]
+      return savedHole ? { ...hole, ...savedHole } : hole
+    })
+
+    onStart({
+      id: createId('round'),
+      courseName: courseName.trim() || 'Unnamed course',
+      teeName: teeName.trim() || 'Unspecified tees',
+      playedOn,
+      createdAt: new Date().toISOString(),
+      status: 'draft',
+      holes,
+      benchmarkVersion: BENCHMARK_VERSION,
+    })
+  }
+
+  return (
+    <section className="page narrow">
+      <button className="text-button" type="button" onClick={onCancel}>
+        ← Back to rounds
+      </button>
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Round setup</span>
+          <h1 className="page-title">Start your round</h1>
+        </div>
+        <div className="segmented">
+          {[9, 18].map((count) => (
+            <button
+              className={holeCount === count ? 'active' : ''}
+              key={count}
+              type="button"
+              onClick={() => setHoleCount(count as 9 | 18)}
+            >
+              {count} holes
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <form onSubmit={submit}>
+        <div className="card form-grid">
+          <label>
+            Course
+            <select
+              autoFocus
+              value={selectedCourseKey}
+              onChange={(event) => {
+                const key = event.target.value
+                const template = courses.find((item) => item.key === key)
+                setSelectedCourseKey(key)
+                setCourseName(template?.name ?? '')
+                setTeeName(template?.teeName ?? '')
+              }}
+            >
+              <option value="">New course</option>
+              {courses.map((template) => (
+                <option value={template.key} key={template.key}>
+                  {template.name} — {template.teeName}
+                </option>
+              ))}
+            </select>
+          </label>
+          {selectedCourseKey === '' && (
+            <>
+              <label>
+                New course name
+                <input
+                  value={courseName}
+                  onChange={(event) => setCourseName(event.target.value)}
+                  placeholder="e.g. Green Valley Golf Club"
+                />
+              </label>
+              <label>
+                Tees
+                <input
+                  value={teeName}
+                  onChange={(event) => setTeeName(event.target.value)}
+                  placeholder="e.g. Blue"
+                />
+              </label>
+            </>
+          )}
+          <label>
+            Date played
+            <input type="date" value={playedOn} onChange={(event) => setPlayedOn(event.target.value)} />
+          </label>
+          <label>
+            Starting hole
+            <select
+              value={startingHole}
+              onChange={(event) => setStartingHole(Number(event.target.value))}
+            >
+              {Array.from({ length: 18 }, (_, index) => index + 1).map((number) => (
+                <option value={number} key={number}>
+                  Hole {number}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="setup-explainer">
+          <strong>
+            {selectedCourseKey
+              ? 'Saved hole details will be reused.'
+              : 'No scorecard entry required.'}
+          </strong>
+          <span>
+            {selectedCourseKey
+              ? 'Any missing holes will be requested when you reach them.'
+              : "You will enter each hole's par and yardage as you play it."}
+          </span>
+        </div>
+        <div className="actions">
+          <button className="secondary" type="button" onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="primary" type="submit">
+            Begin shot entry
+          </button>
+        </div>
+      </form>
+    </section>
+  )
+}
+
+function RoundEntry({
+  round,
+  activeHoleIndex,
+  onHoleChange,
+  onChange,
+  onHoleDetailsChange,
+  onFinish,
+}: {
+  round: Round
+  activeHoleIndex: number
+  onHoleChange: (index: number) => void
+  onChange: (round: Round) => void
+  onHoleDetailsChange: (courseName: string, teeName: string, hole: Hole) => void
+  onFinish: (round: Round) => void
+}) {
+  const hole = round.holes[activeHoleIndex]
+  const needsHoleSetup = hole.par < 3 || hole.yardage <= 0
+  const isHoleComplete = hole.shots.at(-1)?.finish.lie === 'holed'
+  const start: Position =
+    hole.shots.at(-1)?.finish ?? { lie: 'tee', distance: hole.yardage, unit: 'yards' }
+  const [finishLie, setFinishLie] = useState<Lie>(start.lie === 'green' ? 'holed' : 'fairway')
+  const [distance, setDistance] = useState(start.lie === 'green' ? '8' : '100')
+  const [penaltyStrokes, setPenaltyStrokes] = useState(0)
+  const [formError, setFormError] = useState('')
+  const [editingHoleDetails, setEditingHoleDetails] = useState(false)
+  const metrics = calculateRound(round)
+  const liveStrokesGained =
+    metrics.totalShots === 0 ? 0 : metrics.totalStrokesGained
+
+  function addShot(event: React.FormEvent) {
+    event.preventDefault()
+    const parsedDistance = Number(distance)
+    if (finishLie !== 'holed' && (!Number.isFinite(parsedDistance) || parsedDistance <= 0)) {
+      setFormError('Enter a distance greater than zero.')
+      return
+    }
+
+    const finish: Position =
+      finishLie === 'holed'
+        ? { lie: 'holed', distance: 0, unit: 'feet' }
+        : {
+            lie: finishLie,
+            distance: parsedDistance,
+            unit: finishLie === 'green' ? 'feet' : 'yards',
+          }
+
+    const shot = { id: createId('shot'), start, finish, penaltyStrokes }
+    const result = calculateShot(shot, hole.shots.length, hole.par)
+    if (result.error) {
+      setFormError(result.error)
+      return
+    }
+
+    const updatedHoles = round.holes.map((item, index) =>
+      index === activeHoleIndex ? { ...item, shots: [...item.shots, shot] } : item,
+    )
+    onChange({ ...round, holes: updatedHoles })
+    if (finish.lie === 'holed' && activeHoleIndex < round.holes.length - 1) {
+      onHoleChange(activeHoleIndex + 1)
+    }
+  }
+
+  function truncateShots(index: number) {
+    const updatedHoles = round.holes.map((item, holeIndex) =>
+      holeIndex === activeHoleIndex ? { ...item, shots: item.shots.slice(0, index) } : item,
+    )
+    onChange({ ...round, holes: updatedHoles })
+  }
+
+  function goNext() {
+    if (activeHoleIndex < round.holes.length - 1) onHoleChange(activeHoleIndex + 1)
+  }
+
+  function saveHoleDetails(par: number, yardage: number) {
+    const updatedHoles = round.holes.map((item, index) =>
+      index === activeHoleIndex
+        ? {
+            ...item,
+            par,
+            yardage,
+            shots: item.shots.map((shot, shotIndex) =>
+              shotIndex === 0 && shot.start.lie === 'tee'
+                ? {
+                    ...shot,
+                    start: { ...shot.start, distance: yardage, unit: 'yards' as const },
+                  }
+                : shot,
+            ),
+          }
+        : item,
+    )
+    onChange({ ...round, holes: updatedHoles })
+    onHoleDetailsChange(round.courseName, round.teeName ?? 'Unspecified tees', {
+      ...hole,
+      par,
+      yardage,
+    })
+    setEditingHoleDetails(false)
+  }
+
+  const allComplete = metrics.completedHoles === round.holes.length
+
+  return (
+    <section className="entry-page">
+      <div className="entry-topbar">
+        <div>
+          <span className="eyebrow">{round.courseName}</span>
+          <span className="round-tee-name">{round.teeName ?? 'Unspecified tees'}</span>
+          <h1 className="page-title">Hole {hole.number}</h1>
+        </div>
+        <div className="live-score-summary">
+          <div className="score-chip">
+            <strong>{metrics.totalStrokes}</strong>
+            <small>Total strokes</small>
+          </div>
+          <div className="score-chip strokes-gained-chip">
+            <strong
+              className={
+                liveStrokesGained !== null && liveStrokesGained >= 0
+                  ? 'positive'
+                  : 'negative'
+              }
+            >
+              {formatMetric(liveStrokesGained)}
+            </strong>
+            <small>Cumulative SG</small>
+          </div>
+        </div>
+      </div>
+
+      <div className="hole-tabs" aria-label="Select hole">
+        {round.holes.map((item, index) => (
+          <button
+            className={`${index === activeHoleIndex ? 'active' : ''} ${
+              item.shots.at(-1)?.finish.lie === 'holed' ? 'complete' : ''
+            }`}
+            type="button"
+            key={item.number}
+            onClick={() => onHoleChange(index)}
+          >
+            {item.number}
+          </button>
+        ))}
+      </div>
+
+      <div className="live-category-grid" aria-label="Live strokes gained by category">
+        {(Object.keys(metrics.categories) as ShotCategory[]).map((category) => {
+          const metric = metrics.categories[category]
+          return (
+            <div className="live-category" key={category}>
+              <span>{CATEGORY_LABELS[category]}</span>
+              <strong className={metric.total >= 0 ? 'positive' : 'negative'}>
+                {formatMetric(metric.total)}
+              </strong>
+              <small>
+                {metric.shots} shot{metric.shots === 1 ? '' : 's'}
+              </small>
+            </div>
+          )
+        })}
+      </div>
+
+      {metrics.supportedShots !== metrics.totalShots && (
+        <div className="live-coverage-warning">
+          Cumulative SG is unavailable because one or more shots are outside the benchmark
+          range. Category values include supported shots only.
+        </div>
+      )}
+
+      {needsHoleSetup || editingHoleDetails ? (
+        <HoleSetup
+          hole={hole}
+          onCancel={needsHoleSetup ? undefined : () => setEditingHoleDetails(false)}
+          onSave={saveHoleDetails}
+        />
+      ) : (
+      <div className="entry-layout">
+        <div>
+          <div className="hole-summary card">
+            <span>Par {hole.par}</span>
+            <strong>{hole.yardage} yd</strong>
+            <span>{hole.shots.length} shot{hole.shots.length === 1 ? '' : 's'} entered</span>
+            <button
+              className="edit-hole-button"
+              type="button"
+              onClick={() => setEditingHoleDetails(true)}
+            >
+              Edit hole
+            </button>
+          </div>
+
+          {hole.shots.length > 0 && (
+            <div className="shot-timeline card">
+              <h2>Shot history</h2>
+              {hole.shots.map((shot, index) => {
+                const result = calculateShot(shot, index, hole.par)
+                return (
+                  <div className="shot-row" key={shot.id}>
+                    <span className="shot-number">{index + 1}</span>
+                    <span className="shot-description">
+                      <strong>
+                        {LIE_LABELS[shot.start.lie]} {shot.start.distance}
+                        {shot.start.unit === 'feet' ? ' ft' : ' yd'}
+                      </strong>
+                      <small>
+                        to {LIE_LABELS[shot.finish.lie]}
+                        {shot.finish.lie !== 'holed'
+                          ? ` ${shot.finish.distance}${shot.finish.unit === 'feet' ? ' ft' : ' yd'}`
+                          : ''}
+                        {shot.penaltyStrokes ? ` · +${shot.penaltyStrokes} penalty` : ''}
+                      </small>
+                    </span>
+                    <strong className={result.strokesGained !== null && result.strokesGained >= 0 ? 'positive' : 'negative'}>
+                      {formatMetric(result.strokesGained)}
+                    </strong>
+                    <button className="icon-button" type="button" onClick={() => truncateShots(index)}>
+                      Undo
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="card shot-form-card">
+          {isHoleComplete ? (
+            <div className="complete-panel">
+              <span className="complete-check">✓</span>
+              <h2>Hole complete</h2>
+              <p>
+                Score: {hole.shots.reduce((sum, shot) => sum + 1 + shot.penaltyStrokes, 0)}
+              </p>
+              {activeHoleIndex < round.holes.length - 1 && (
+                <button className="primary" type="button" onClick={goNext}>
+                  Continue to hole {round.holes[activeHoleIndex + 1].number}
+                </button>
+              )}
+              {allComplete && (
+                <button className="primary" type="button" onClick={() => onFinish(round)}>
+                  Finish round
+                </button>
+              )}
+              <button className="secondary" type="button" onClick={() => truncateShots(hole.shots.length - 1)}>
+                Undo last shot
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={addShot}>
+              <span className="eyebrow">Shot {hole.shots.length + 1}</span>
+              <h2>
+                From {LIE_LABELS[start.lie]}, {start.distance}
+                {start.unit === 'feet' ? ' ft' : ' yd'}
+              </h2>
+              <p className="muted">Where did the ball finish?</p>
+
+              <div className="lie-buttons">
+                {PLAYABLE_LIES.map((lie) => (
+                  <button
+                    className={finishLie === lie ? 'active' : ''}
+                    type="button"
+                    key={lie}
+                    onClick={() => setFinishLie(lie)}
+                  >
+                    {LIE_LABELS[lie]}
+                  </button>
+                ))}
+              </div>
+
+              {finishLie !== 'holed' && (
+                <label>
+                  Distance remaining ({finishLie === 'green' ? 'feet' : 'yards'})
+                  <input
+                    inputMode="decimal"
+                    min="0.1"
+                    required
+                    step="0.1"
+                    type="number"
+                    value={distance}
+                    onChange={(event) => setDistance(event.target.value)}
+                  />
+                  <small>Supported range: {benchmarkRange(finishLie)}</small>
+                </label>
+              )}
+
+              <label>
+                Penalty strokes on this shot
+                <select
+                  value={penaltyStrokes}
+                  onChange={(event) => setPenaltyStrokes(Number(event.target.value))}
+                >
+                  <option value="0">None</option>
+                  <option value="1">1 stroke</option>
+                  <option value="2">2 strokes</option>
+                </select>
+              </label>
+
+              {formError && <div className="error-message">{formError}</div>}
+              <button
+                autoFocus={finishLie === 'holed'}
+                className="primary full-width"
+                type="submit"
+              >
+                Save shot
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+      )}
+    </section>
+  )
+}
+
+function CourseLibrary({
+  courses,
+  onBack,
+  onDelete,
+  onEdit,
+}: {
+  courses: CourseTemplate[]
+  onBack: () => void
+  onDelete: (course: CourseTemplate) => void
+  onEdit: (course: CourseTemplate) => void
+}) {
+  return (
+    <section className="page narrow">
+      <button className="text-button" type="button" onClick={onBack}>
+        ← Back to rounds
+      </button>
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Saved scorecards</span>
+          <h1 className="page-title">Courses</h1>
+        </div>
+        <span className="pill">{courses.length} saved</span>
+      </div>
+      {courses.length === 0 ? (
+        <div className="empty-state">
+          <h3>No courses yet</h3>
+          <p>Courses appear here after you start entering hole details in a round.</p>
+        </div>
+      ) : (
+        <div className="course-list">
+          {courses.map((course) => (
+            <div className="course-row card" key={course.key}>
+              <span>
+                <strong>{course.name}</strong>
+                <small>
+                  {course.teeName} · {Object.keys(course.holes).length} holes configured
+                </small>
+              </span>
+              <div className="course-row-actions">
+                <button className="danger-button" type="button" onClick={() => onDelete(course)}>
+                  Delete
+                </button>
+                <button className="secondary" type="button" onClick={() => onEdit(course)}>
+                  Edit course
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function CourseEditor({
+  course,
+  onCancel,
+  onSave,
+}: {
+  course?: CourseTemplate
+  onCancel: () => void
+  onSave: (course: CourseTemplate) => void
+}) {
+  const originalName = course?.name ?? ''
+  const originalTeeName = course?.teeName ?? 'Unspecified tees'
+  const [name, setName] = useState(originalName)
+  const [teeName, setTeeName] = useState(originalTeeName)
+  const [holes, setHoles] = useState(() =>
+    Array.from({ length: 18 }, (_, index) => {
+      const saved = course?.holes[index + 1]
+      return {
+        number: index + 1,
+        par: saved ? String(saved.par) : '',
+        yardage: saved ? String(saved.yardage) : '',
+      }
+    }),
+  )
+
+  if (!course) {
+    return (
+      <section className="page narrow">
+        <div className="empty-state">
+          <h3>Course not found</h3>
+          <button className="primary" type="button" onClick={onCancel}>
+            Back to courses
+          </button>
+        </div>
+      </section>
+    )
+  }
+
+  function updateHole(index: number, field: 'par' | 'yardage', value: string) {
+    setHoles((current) =>
+      current.map((hole, holeIndex) =>
+        holeIndex === index ? { ...hole, [field]: value } : hole,
+      ),
+    )
+  }
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault()
+    const savedHoles: CourseTemplate['holes'] = {}
+    for (const hole of holes) {
+      const par = Number(hole.par)
+      const yardage = Number(hole.yardage)
+      if (par >= 3 && par <= 5 && yardage > 0) {
+        savedHoles[hole.number] = { par, yardage }
+      }
+    }
+    const trimmedName = name.trim() || originalName
+    const trimmedTeeName = teeName.trim() || 'Unspecified tees'
+    onSave({
+      key: courseKey(trimmedName, trimmedTeeName),
+      name: trimmedName,
+      teeName: trimmedTeeName,
+      holes: savedHoles,
+    })
+  }
+
+  return (
+    <section className="page narrow">
+      <button className="text-button" type="button" onClick={onCancel}>
+        ← Back to courses
+      </button>
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Course editor</span>
+          <h1 className="page-title">{course.name}</h1>
+        </div>
+      </div>
+      <form onSubmit={submit}>
+        <div className="card course-name-field">
+          <div className="course-identity-grid">
+            <label>
+              Course name
+              <input value={name} onChange={(event) => setName(event.target.value)} />
+            </label>
+            <label>
+              Tees
+              <input
+                value={teeName}
+                onChange={(event) => setTeeName(event.target.value)}
+                placeholder="e.g. Blue"
+              />
+            </label>
+          </div>
+        </div>
+        <div className="card hole-grid-card">
+          <div className="hole-grid editor-header">
+            <span>Hole</span>
+            <span>Par</span>
+            <span>Yards</span>
+            <span>Status</span>
+          </div>
+          {holes.map((hole, index) => (
+            <div className="hole-grid" key={hole.number}>
+              <strong>{hole.number}</strong>
+              <select
+                aria-label={`Hole ${hole.number} par`}
+                value={hole.par}
+                onChange={(event) => updateHole(index, 'par', event.target.value)}
+              >
+                <option value="">—</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+              <input
+                aria-label={`Hole ${hole.number} yardage`}
+                inputMode="numeric"
+                min="1"
+                type="number"
+                value={hole.yardage}
+                onChange={(event) => updateHole(index, 'yardage', event.target.value)}
+              />
+              <small className={hole.par && hole.yardage ? 'supported' : 'unsupported'}>
+                {hole.par && hole.yardage ? 'Ready' : 'Not configured'}
+              </small>
+            </div>
+          ))}
+        </div>
+        <div className="actions">
+          <button className="secondary" type="button" onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="primary" type="submit">
+            Save course
+          </button>
+        </div>
+      </form>
+    </section>
+  )
+}
+
+function HoleSetup({
+  hole,
+  onCancel,
+  onSave,
+}: {
+  hole: Hole
+  onCancel?: () => void
+  onSave: (par: number, yardage: number) => void
+}) {
+  const [par, setPar] = useState(hole.par >= 3 ? hole.par : 4)
+  const [yardage, setYardage] = useState(hole.yardage > 0 ? String(hole.yardage) : '400')
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault()
+    const parsedYardage = Number(yardage)
+    if (Number.isFinite(parsedYardage) && parsedYardage > 0) {
+      onSave(par, parsedYardage)
+    }
+  }
+
+  return (
+    <div className="card per-hole-setup">
+      <span className="eyebrow">Hole {hole.number}</span>
+      <form onSubmit={submit}>
+        <label>
+          Par
+          <select value={par} onChange={(event) => setPar(Number(event.target.value))}>
+            <option value="3">Par 3</option>
+            <option value="4">Par 4</option>
+            <option value="5">Par 5</option>
+          </select>
+        </label>
+        <label>
+          Yardage
+          <input
+            autoFocus
+            inputMode="numeric"
+            min="1"
+            required
+            type="number"
+            value={yardage}
+            onChange={(event) => setYardage(event.target.value)}
+          />
+        </label>
+        <div className="hole-setup-actions">
+          {onCancel && (
+            <button className="secondary" type="button" onClick={onCancel}>
+              Cancel
+            </button>
+          )}
+          <button className="primary" type="submit">
+            {onCancel ? 'Save hole details' : `Start hole ${hole.number}`}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function Results({
+  round,
+  allRounds,
+  onBack,
+  onEdit,
+}: {
+  round: Round
+  allRounds: Round[]
+  onBack: () => void
+  onEdit: () => void
+}) {
+  const metrics = calculateRound(round)
+  const baseline = buildPersonalBaseline(allRounds, round)
+  const personalDifference =
+    metrics.strokesGainedPer18 !== null && baseline.averageSgPer18 !== null
+      ? metrics.strokesGainedPer18 - baseline.averageSgPer18
+      : null
+
+  return (
+    <section className="page">
+      <div className="results-heading">
+        <div>
+          <button className="text-button" type="button" onClick={onBack}>
+            ← All rounds
+          </button>
+          <span className="eyebrow">{round.playedOn}</span>
+          <h1 className="page-title">{round.courseName}</h1>
+        </div>
+        <button className="secondary" type="button" onClick={onEdit}>
+          Edit shots
+        </button>
+      </div>
+
+      <div className="metric-grid">
+        <MetricCard label="Total strokes" value={String(metrics.totalStrokes)} detail={`${metrics.completedHoles} holes`} />
+        <MetricCard
+          label="Vs PGA Tour average"
+          value={formatMetric(metrics.strokesGainedPer18)}
+          detail="SG per 18"
+        />
+        <MetricCard
+          label="Vs your average"
+          value={formatMetric(personalDifference)}
+          detail={
+            baseline.averageSgPer18 === null
+              ? `${Math.max(0, 5 - baseline.includedRounds)} more prior rounds needed`
+              : `${baseline.status} · ${baseline.includedRounds} rounds`
+          }
+        />
+      </div>
+
+      <div className="card">
+        <div className="section-heading compact-heading">
+          <div>
+            <span className="eyebrow">Performance breakdown</span>
+          </div>
+        </div>
+        <div className="category-table">
+          <div className="category-row table-header">
+            <span>Category</span>
+            <span>Vs PGA Tour average</span>
+            <span>Vs personal / shot</span>
+          </div>
+          {(Object.keys(metrics.categories) as ShotCategory[]).map((category) => {
+            const metric = metrics.categories[category]
+            const personal = baseline.categoryPerShot[category]
+            return (
+              <div className="category-row" key={category}>
+                <strong>{CATEGORY_LABELS[category]}</strong>
+                <span className={metric.total >= 0 ? 'positive' : 'negative'}>
+                  {formatMetric(metric.total)}
+                </span>
+                <span>
+                  {personal === undefined || !metric.shots
+                    ? 'N/A'
+                    : formatMetric(metric.perShot - personal)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {metrics.totalStrokesGained === null && (
+        <div className="warning-message">
+          Some shots fall outside the excerpt-derived benchmark ranges, so the round SG total is
+          intentionally unavailable rather than estimated.
+        </div>
+      )}
+    </section>
+  )
+}
+
+function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="metric-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
+  )
+}
+
+export default App

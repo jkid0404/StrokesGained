@@ -1,0 +1,117 @@
+import type { CloudState, LocalState } from './cloudState'
+
+export interface ClientPrincipal {
+  identityProvider: string
+  userId: string
+  userDetails: string
+  userRoles: string[]
+}
+
+export type AuthResult =
+  | { available: false; principal: null }
+  | { available: true; principal: ClientPrincipal | null }
+
+export class CloudRequestError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
+export async function fetchAuthState(signal?: AbortSignal): Promise<AuthResult> {
+  try {
+    const response = await fetch('/.auth/me', {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal,
+    })
+    if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+      return { available: false, principal: null }
+    }
+
+    const body = (await response.json()) as { clientPrincipal?: ClientPrincipal | null }
+    if (!Object.prototype.hasOwnProperty.call(body, 'clientPrincipal')) {
+      return { available: false, principal: null }
+    }
+    return { available: true, principal: body.clientPrincipal ?? null }
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    const localHost =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname === '::1'
+    return { available: !localHost, principal: null }
+  }
+}
+
+export async function fetchCloudState(signal?: AbortSignal): Promise<CloudState> {
+  const response = await fetch('/api/state', {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+    signal,
+  })
+  return parseStateResponse(response)
+}
+
+export async function putCloudState(
+  state: LocalState,
+  revision: number,
+  signal?: AbortSignal,
+): Promise<CloudState> {
+  const response = await fetch('/api/state', {
+    method: 'PUT',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ...state, revision }),
+    signal,
+  })
+  return parseStateResponse(response, true)
+}
+
+async function parseStateResponse(
+  response: Response,
+  allowConflict = false,
+): Promise<CloudState> {
+  const body = (await response.json().catch(() => null)) as
+    | (Partial<CloudState> & { error?: string })
+    | null
+
+  if (!response.ok) {
+    const message = body?.error ?? `Cloud request failed with status ${response.status}.`
+    if (allowConflict && response.status === 409 && isCloudState(body)) {
+      throw new CloudConflictError(message, body)
+    }
+    throw new CloudRequestError(message, response.status)
+  }
+
+  if (!isCloudState(body)) {
+    throw new CloudRequestError('The cloud returned an invalid state response.', 502)
+  }
+  return body
+}
+
+export class CloudConflictError extends Error {
+  readonly current: CloudState
+
+  constructor(message: string, current: CloudState) {
+    super(message)
+    this.current = current
+  }
+}
+
+function isCloudState(value: unknown): value is CloudState {
+  if (typeof value !== 'object' || value === null) return false
+  const candidate = value as Partial<CloudState>
+  return (
+    Array.isArray(candidate.rounds) &&
+    Array.isArray(candidate.courses) &&
+    Array.isArray(candidate.deletedCourseKeys) &&
+    Number.isSafeInteger(candidate.revision) &&
+    (typeof candidate.updatedAt === 'string' || candidate.updatedAt === null) &&
+    typeof candidate.exists === 'boolean'
+  )
+}
