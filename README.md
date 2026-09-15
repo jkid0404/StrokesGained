@@ -82,8 +82,8 @@ After `az login`, run:
 
 `AllowedUserEmail` is mandatory and is neither committed nor hardcoded. The
 script selects the required subscription, creates `StrokesGained` if needed,
-deploys Bicep, retrieves the Cosmos connection string without printing it, and
-sets these Static Web Apps application settings:
+and deploys Bicep. Bicep configures these Static Web Apps application settings
+without returning the Cosmos credential to the caller:
 
 - `COSMOS_CONNECTION_STRING`
 - `COSMOS_DATABASE_NAME`
@@ -94,6 +94,17 @@ The script then prints the command for retrieving the Static Web Apps deployment
 token. The client SPA stays anonymously loadable so React can present a sign-in
 screen; `/api/*` requires the `authenticated` role and the API additionally
 enforces the single-user email allowlist.
+
+Provisioned Azure resources:
+
+- Resource group: `StrokesGained`
+- Static Web App: `golfsgjkid-whrbxmw3qdbc6`
+- URL: `https://blue-coast-04c2a1b1e.3.azurestaticapps.net`
+- Cosmos DB account: `golfsgjkidwhrbxmw3qdbc6`
+
+The initial allowlisted identity is `jasowang@umich.edu`. Change
+`ALLOWED_USER_EMAIL` in the Static Web App settings if the Microsoft account
+used at sign-in has a different email.
 
 ## GitHub deployment
 

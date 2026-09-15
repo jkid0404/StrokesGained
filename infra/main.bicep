@@ -14,6 +14,9 @@ param databaseName string = 'strokesgained'
 @description('Cosmos DB container name.')
 param containerName string = 'ownerState'
 
+@description('Only Microsoft account email permitted to access application data.')
+param allowedUserEmail string
+
 var suffix = uniqueString(subscription().subscriptionId, resourceGroup().id, prefix)
 var cosmosAccountName = take(toLower('${prefix}${suffix}'), 44)
 var staticWebAppName = take(toLower('${prefix}-${suffix}'), 60)
@@ -80,6 +83,17 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
   }
   properties: {
     allowConfigFileUpdates: true
+  }
+}
+
+resource staticWebAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
+  parent: staticWebApp
+  name: 'appsettings'
+  properties: {
+    COSMOS_CONNECTION_STRING: cosmosAccount.listConnectionStrings().connectionStrings[0].connectionString
+    COSMOS_DATABASE_NAME: database.name
+    COSMOS_CONTAINER_NAME: stateContainer.name
+    ALLOWED_USER_EMAIL: allowedUserEmail
   }
 }
 
