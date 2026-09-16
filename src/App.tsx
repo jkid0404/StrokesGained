@@ -1343,7 +1343,7 @@ function Results({
           <div className="category-row table-header">
             <span>Category</span>
             <span>Vs PGA Tour average</span>
-            <span>Vs personal / shot</span>
+            <span>Vs your average</span>
           </div>
           {(Object.keys(metrics.categories) as ShotCategory[]).map((category) => {
             const metric = metrics.categories[category]
