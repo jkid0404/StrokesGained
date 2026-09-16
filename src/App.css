@@ -993,6 +993,35 @@ textarea:focus {
   margin-top: 4px;
 }
 
+.bag-description {
+  margin: -18px 0 24px;
+}
+
+.bag-add-form {
+  align-items: end;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr auto;
+  margin-bottom: 18px;
+  padding: 20px;
+}
+
+.bag-add-form label {
+  margin: 0;
+}
+
+.bag-row > strong {
+  overflow-wrap: anywhere;
+}
+
+.bag-rename-form {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr auto auto;
+  width: 100%;
+}
+
 .course-name-field {
   margin-bottom: 18px;
   padding: 22px;
@@ -1588,10 +1617,13 @@ button:disabled {
 
   nav {
     gap: 4px;
+    min-width: 0;
+    overflow-x: auto;
   }
 
   .header-controls {
     gap: 7px;
+    min-width: 0;
   }
 
   .cloud-account {
@@ -1629,7 +1661,8 @@ button:disabled {
 
   .form-grid,
   .entry-layout,
-  .course-identity-grid {
+  .course-identity-grid,
+  .bag-add-form {
     grid-template-columns: 1fr;
   }
 
@@ -1702,6 +1735,10 @@ button:disabled {
   .shot-editor-grid {
     grid-template-columns: 1fr;
   }
+
+  .bag-add-form .primary {
+    width: 100%;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1740,7 +1777,25 @@ button:disabled {
 
   .nav-button {
     font-size: 13px;
-    padding: 0 7px;
+    padding: 0 6px;
+  }
+
+  .bag-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .bag-row .course-row-actions {
+    justify-content: flex-end;
+  }
+
+  .bag-rename-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .bag-rename-form input {
+    grid-column: 1 / -1;
   }
 
   .trend-filter-grid,

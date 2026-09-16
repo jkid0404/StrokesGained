@@ -325,6 +325,7 @@ export function useCloudSync({
       rounds: conflictState.rounds,
       courses: conflictState.courses,
       deletedCourseKeys: conflictState.deletedCourseKeys,
+      clubs: conflictState.clubs,
     }
     revisionRef.current = conflictState.revision
     lastSyncedRef.current = stateFingerprint(state)
@@ -364,7 +365,8 @@ export function useCloudSync({
     return (
       state.rounds.length > 0 ||
       state.courses.length > 0 ||
-      state.deletedCourseKeys.length > 0
+      state.deletedCourseKeys.length > 0 ||
+      state.clubs.length > 0
     )
   }
 }

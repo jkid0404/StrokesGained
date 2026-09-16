@@ -41,6 +41,11 @@ export async function writeOwnerState(
     rounds: payload.rounds,
     courses: payload.courses,
     deletedCourseKeys: payload.deletedCourseKeys,
+    ...(payload.clubs !== undefined
+      ? { clubs: payload.clubs }
+      : current.state?.clubs !== undefined
+        ? { clubs: current.state.clubs }
+        : {}),
     revision: currentRevision + 1,
     updatedAt: new Date().toISOString(),
   }

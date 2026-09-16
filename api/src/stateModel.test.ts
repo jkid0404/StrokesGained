@@ -30,9 +30,10 @@ describe('cloud state validation', () => {
           },
         ],
         deletedCourseKeys: ['course::tee'],
+        clubs: ['Driver', '7 iron', 'Putter'],
         revision: 3,
       }),
-    ).toMatchObject({ revision: 3 })
+    ).toMatchObject({ clubs: ['Driver', '7 iron', 'Putter'], revision: 3 })
   })
 
   it('rejects owner identity and invalid revisions from the body', () => {
@@ -132,5 +133,40 @@ describe('cloud state validation', () => {
         ],
       }),
     ).toThrow(ValidationError)
+  })
+
+  it('accepts an omitted or empty bag for compatibility', () => {
+    const payload = {
+      rounds: [],
+      courses: [],
+      deletedCourseKeys: [],
+      revision: 0,
+    }
+
+    expect(validateStatePayload(payload)).not.toHaveProperty('clubs')
+    expect(validateStatePayload({ ...payload, clubs: [] })).toMatchObject({
+      clubs: [],
+    })
+  })
+
+  it('rejects invalid or duplicate club names', () => {
+    const payload = {
+      rounds: [],
+      courses: [],
+      deletedCourseKeys: [],
+      revision: 0,
+    }
+
+    for (const clubs of [
+      [''],
+      [' Driver'],
+      ['x'.repeat(41)],
+      ['Driver', 'driver'],
+      Array.from({ length: 101 }, (_, index) => `Club ${index}`),
+    ]) {
+      expect(() => validateStatePayload({ ...payload, clubs })).toThrow(
+        ValidationError,
+      )
+    }
   })
 })

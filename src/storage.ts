@@ -1,8 +1,9 @@
-import type { CourseTemplate, Round } from './domain'
+import { CLUB_OPTIONS, type CourseTemplate, type Round } from './domain'
 
 const STORAGE_KEY = 'golf-strokes-gained-rounds-v1'
 const COURSES_STORAGE_KEY = 'golf-strokes-gained-courses-v1'
 const DELETED_COURSES_STORAGE_KEY = 'golf-strokes-gained-deleted-courses-v1'
+const CLUBS_STORAGE_KEY = 'golf-strokes-gained-clubs-v1'
 const CLOUD_METADATA_STORAGE_KEY = 'golf-strokes-gained-cloud-metadata-v1'
 
 export interface CloudMetadata {
@@ -49,6 +50,24 @@ export function loadDeletedCourseKeys(): string[] {
 
 export function saveDeletedCourseKeys(keys: string[]): void {
   window.localStorage.setItem(DELETED_COURSES_STORAGE_KEY, JSON.stringify(keys))
+}
+
+export function loadClubs(): string[] {
+  try {
+    const raw = window.localStorage.getItem(CLUBS_STORAGE_KEY)
+    if (!raw) return [...CLUB_OPTIONS]
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) &&
+      parsed.every((club) => typeof club === 'string' && club.length > 0 && club.length <= 40)
+      ? parsed
+      : [...CLUB_OPTIONS]
+  } catch {
+    return [...CLUB_OPTIONS]
+  }
+}
+
+export function saveClubs(clubs: string[]): void {
+  window.localStorage.setItem(CLUBS_STORAGE_KEY, JSON.stringify(clubs))
 }
 
 export function loadCloudMetadata(): CloudMetadata | null {

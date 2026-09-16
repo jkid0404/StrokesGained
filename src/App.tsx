@@ -2,7 +2,6 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import {
   BENCHMARK_VERSION,
-  CLUB_OPTIONS,
   LIE_LABELS,
   benchmarkRange,
   buildCourseTemplates,
@@ -29,8 +28,10 @@ import {
 } from './domain'
 import {
   loadCourses,
+  loadClubs,
   loadDeletedCourseKeys,
   loadRounds,
+  saveClubs,
   saveCourses,
   saveDeletedCourseKeys,
   saveRounds,
@@ -50,6 +51,7 @@ type View =
   | 'trends'
   | 'courses'
   | 'course-edit'
+  | 'bag'
 
 const CATEGORY_LABELS: Record<ShotCategory, string> = {
   'off-the-tee': 'Off the tee',
@@ -69,6 +71,20 @@ function calculateHoleStrokesGained(hole: Hole): number | null {
   return results.reduce((sum, result) => sum + (result.strokesGained ?? 0), 0)
 }
 
+function availableDefaultClub(
+  start: Position,
+  clubs: string[],
+  mostRecentTeeClub: string,
+  mostRecentOtherClub: string,
+): string {
+  const preferred = defaultClub(start, mostRecentTeeClub, mostRecentOtherClub)
+  if (clubs.includes(preferred)) return preferred
+  if (start.lie === 'tee') {
+    return clubs.find((club) => club !== 'Putter') ?? clubs[0] ?? ''
+  }
+  return ''
+}
+
 function App() {
   const [rounds, setRounds] = useState<Round[]>(loadRounds)
   const [courses, setCourses] = useState<CourseTemplate[]>(() =>
@@ -78,6 +94,7 @@ function App() {
     ),
   )
   const [deletedCourseKeys, setDeletedCourseKeys] = useState<string[]>(loadDeletedCourseKeys)
+  const [clubs, setClubs] = useState<string[]>(loadClubs)
   const [view, setView] = useState<View>('home')
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null)
   const [activeHoleIndex, setActiveHoleIndex] = useState(0)
@@ -86,18 +103,20 @@ function App() {
   useEffect(() => saveRounds(rounds), [rounds])
   useEffect(() => saveCourses(courses), [courses])
   useEffect(() => saveDeletedCourseKeys(deletedCourseKeys), [deletedCourseKeys])
+  useEffect(() => saveClubs(clubs), [clubs])
 
   const applyCloudState = useCallback((state: LocalState) => {
     setRounds(state.rounds)
     setCourses(state.courses)
     setDeletedCourseKeys(state.deletedCourseKeys)
+    setClubs(state.clubs)
     setActiveRoundId(null)
     setActiveCourseKey(null)
     setView('home')
   }, [])
 
   const cloud = useCloudSync({
-    localState: { rounds, courses, deletedCourseKeys },
+    localState: { rounds, courses, deletedCourseKeys, clubs },
     applyState: applyCloudState,
   })
   const pwa = usePwaUpdate()
@@ -110,6 +129,7 @@ function App() {
     view === 'home' || view === 'entry' || view === 'review' || view === 'results'
   const trendsSelected = view === 'trends'
   const coursesSelected = view === 'courses' || view === 'course-edit'
+  const bagSelected = view === 'bag'
 
   function upsertRound(round: Round) {
     setRounds((current) => {
@@ -241,6 +261,13 @@ function App() {
               Courses
             </button>
             <button
+              className={`nav-button ${bagSelected ? 'active' : ''}`}
+              type="button"
+              onClick={() => setView('bag')}
+            >
+              Bag
+            </button>
+            <button
               className={`nav-button new-round ${view === 'setup' ? 'active' : ''}`}
               type="button"
               onClick={() => setView('setup')}
@@ -317,6 +344,7 @@ function App() {
           <RoundEntry
             key={activeRound.id}
             round={activeRound}
+            clubs={clubs}
             activeHoleIndex={Math.max(0, activeHoleIndex)}
             isCloudSynced={
               cloud.syncStatus === 'saved' && cloud.pendingChanges === 0
@@ -361,6 +389,13 @@ function App() {
               setActiveCourseKey(course.key)
               setView('course-edit')
             }}
+          />
+        )}
+        {view === 'bag' && (
+          <BagManager
+            clubs={clubs}
+            onBack={() => setView('home')}
+            onChange={setClubs}
           />
         )}
         {view === 'course-edit' && activeCourseKey && (
@@ -751,6 +786,7 @@ function RoundSetup({
 
 function RoundEntry({
   round,
+  clubs,
   activeHoleIndex,
   isCloudSynced,
   onHoleChange,
@@ -759,6 +795,7 @@ function RoundEntry({
   onReview,
 }: {
   round: Round
+  clubs: string[]
   activeHoleIndex: number
   isCloudSynced: boolean
   onHoleChange: (index: number) => void
@@ -775,7 +812,7 @@ function RoundEntry({
   const startDistance = start.distance
   const startUnit = start.unit
   const mostRecentFinishLie = useRef<Lie>('fairway')
-  const mostRecentTeeClub = useRef('Driver')
+  const mostRecentTeeClub = useRef(clubs.includes('Driver') ? 'Driver' : '')
   const mostRecentOtherClub = useRef('')
   const initialFinishLie = defaultFinishLie(
     hole.par,
@@ -788,7 +825,14 @@ function RoundEntry({
     String(defaultDistanceEntry(start, initialFinishLie)),
   )
   const [penaltyStrokes, setPenaltyStrokes] = useState(0)
-  const [club, setClub] = useState(() => defaultClub(start, 'Driver', ''))
+  const [club, setClub] = useState(() =>
+    availableDefaultClub(
+      start,
+      clubs,
+      clubs.includes('Driver') ? 'Driver' : '',
+      '',
+    ),
+  )
   const [note, setNote] = useState('')
   const [formError, setFormError] = useState('')
   const [editingHoleDetails, setEditingHoleDetails] = useState(false)
@@ -821,8 +865,9 @@ function RoundEntry({
     )
     setPenaltyStrokes(0)
     setClub(
-      defaultClub(
+      availableDefaultClub(
         { lie: startLie, distance: startDistance, unit: startUnit },
+        clubs,
         mostRecentTeeClub.current,
         mostRecentOtherClub.current,
       ),
@@ -831,7 +876,15 @@ function RoundEntry({
     setFormError('')
     setEditingHoleDetails(false)
     setEditingShotIndex(null)
-  }, [activeHoleIndex, hole.par, hole.shots.length, startDistance, startLie, startUnit])
+  }, [
+    activeHoleIndex,
+    clubs,
+    hole.par,
+    hole.shots.length,
+    startDistance,
+    startLie,
+    startUnit,
+  ])
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -965,7 +1018,7 @@ function RoundEntry({
 
   const allComplete = metrics.completedHoles === round.holes.length
   const clubIsCustom =
-    club !== '' && club !== 'Other' && !CLUB_OPTIONS.some((option) => option === club)
+    club !== '' && !clubs.some((option) => option === club)
 
   return (
     <section className="entry-page">
@@ -1144,6 +1197,7 @@ function RoundEntry({
                     </div>
                     {editingShotIndex === index && (
                       <ShotEditor
+                        clubs={clubs}
                         isLast={index === hole.shots.length - 1}
                         onCancel={() => setEditingShotIndex(null)}
                         onSave={(updatedShot) => saveEditedShot(index, updatedShot)}
@@ -1272,12 +1326,11 @@ function RoundEntry({
                     >
                       <option value="">No club recorded</option>
                       {clubIsCustom && <option value={club}>{club}</option>}
-                      {CLUB_OPTIONS.map((option) => (
+                      {clubs.map((option) => (
                         <option value={option} key={option}>
                           {option}
                         </option>
                       ))}
-                      <option value="Other">Other</option>
                     </select>
                   </label>
                   <label>
@@ -1365,8 +1418,189 @@ function CourseLibrary({
   )
 }
 
+function BagManager({
+  clubs,
+  onBack,
+  onChange,
+}: {
+  clubs: string[]
+  onBack: () => void
+  onChange: (clubs: string[]) => void
+}) {
+  const [newClub, setNewClub] = useState('')
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const [error, setError] = useState('')
+
+  function validateName(name: string, ignoredIndex: number | null = null): string | null {
+    const trimmed = name.trim()
+    if (!trimmed) return 'Enter a club name.'
+    if (trimmed.length > 40) return 'Club names must be 40 characters or fewer.'
+    if (ignoredIndex === null && clubs.length >= 100) {
+      return 'Your bag can contain at most 100 clubs.'
+    }
+    const duplicate = clubs.some(
+      (club, index) =>
+        index !== ignoredIndex && club.toLocaleLowerCase() === trimmed.toLocaleLowerCase(),
+    )
+    return duplicate ? 'That club is already in your bag.' : null
+  }
+
+  function addClub(event: React.FormEvent) {
+    event.preventDefault()
+    const validationError = validateName(newClub)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+    onChange([...clubs, newClub.trim()])
+    setNewClub('')
+    setError('')
+  }
+
+  function startRename(index: number) {
+    setEditingIndex(index)
+    setEditingName(clubs[index])
+    setError('')
+  }
+
+  function renameClub(event: React.FormEvent) {
+    event.preventDefault()
+    if (editingIndex === null) return
+    const validationError = validateName(editingName, editingIndex)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+    onChange(
+      clubs.map((club, index) => (index === editingIndex ? editingName.trim() : club)),
+    )
+    setEditingIndex(null)
+    setEditingName('')
+    setError('')
+  }
+
+  function deleteClub(index: number) {
+    const club = clubs[index]
+    const confirmed = window.confirm(
+      `Delete ${club} from your bag? Historical shots will keep their recorded club.`,
+    )
+    if (!confirmed) return
+    onChange(clubs.filter((_, clubIndex) => clubIndex !== index))
+    if (editingIndex === index) {
+      setEditingIndex(null)
+      setEditingName('')
+    } else if (editingIndex !== null && editingIndex > index) {
+      setEditingIndex(editingIndex - 1)
+    }
+    setError('')
+  }
+
+  return (
+    <section className="page narrow">
+      <button className="text-button" type="button" onClick={onBack}>
+        ← Back to rounds
+      </button>
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Club presets</span>
+          <h1 className="page-title">Manage My Bag</h1>
+        </div>
+        <span className="pill">{clubs.length} clubs</span>
+      </div>
+      <p className="muted bag-description">
+        These clubs appear during shot entry. Renaming or deleting one does not change
+        historical shots.
+      </p>
+
+      <form className="card bag-add-form" onSubmit={addClub}>
+        <label>
+          Add a club
+          <input
+            maxLength={40}
+            placeholder="e.g. 5 hybrid"
+            value={newClub}
+            onChange={(event) => {
+              setNewClub(event.target.value)
+              setError('')
+            }}
+          />
+        </label>
+        <button className="primary" type="submit">
+          Add club
+        </button>
+      </form>
+
+      {error && <div className="error-message">{error}</div>}
+
+      {clubs.length === 0 ? (
+        <div className="empty-state">
+          <h3>Your bag is empty</h3>
+          <p>Add a club above to make it available during shot entry.</p>
+        </div>
+      ) : (
+        <div className="course-list">
+          {clubs.map((club, index) => (
+            <div className="course-row card bag-row" key={`${club}-${index}`}>
+              {editingIndex === index ? (
+                <form className="bag-rename-form" onSubmit={renameClub}>
+                  <input
+                    aria-label={`Rename ${club}`}
+                    autoFocus
+                    maxLength={40}
+                    value={editingName}
+                    onChange={(event) => {
+                      setEditingName(event.target.value)
+                      setError('')
+                    }}
+                  />
+                  <button
+                    className="secondary compact"
+                    type="button"
+                    onClick={() => {
+                      setEditingIndex(null)
+                      setEditingName('')
+                      setError('')
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button className="primary compact" type="submit">
+                    Save
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <strong>{club}</strong>
+                  <div className="course-row-actions">
+                    <button
+                      className="danger-button"
+                      type="button"
+                      onClick={() => deleteClub(index)}
+                    >
+                      Delete
+                    </button>
+                    <button
+                      className="secondary"
+                      type="button"
+                      onClick={() => startRename(index)}
+                    >
+                      Rename
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function ShotEditor({
   shot,
+  clubs,
   shotIndex,
   par,
   isLast,
@@ -1374,6 +1608,7 @@ function ShotEditor({
   onCancel,
 }: {
   shot: Shot
+  clubs: string[]
   shotIndex: number
   par: number
   isLast: boolean
@@ -1477,15 +1712,14 @@ function ShotEditor({
           Club
           <select value={club} onChange={(event) => setClub(event.target.value)}>
             <option value="">No club recorded</option>
-            {club && !CLUB_OPTIONS.some((option) => option === club) && (
+            {club && !clubs.some((option) => option === club) && (
               <option value={club}>{club}</option>
             )}
-            {CLUB_OPTIONS.map((option) => (
+            {clubs.map((option) => (
               <option value={option} key={option}>
                 {option}
               </option>
             ))}
-            <option value="Other">Other</option>
           </select>
         </label>
       </div>

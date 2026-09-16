@@ -1,4 +1,5 @@
 import type { CloudState, LocalState } from './cloudState'
+import { CLUB_OPTIONS } from './domain'
 
 export interface ClientPrincipal {
   identityProvider: string
@@ -82,16 +83,18 @@ async function parseStateResponse(
 
   if (!response.ok) {
     const message = body?.error ?? `Cloud request failed with status ${response.status}.`
-    if (allowConflict && response.status === 409 && isCloudState(body)) {
-      throw new CloudConflictError(message, body)
+    const conflictState = normalizeCloudState(body)
+    if (allowConflict && response.status === 409 && conflictState) {
+      throw new CloudConflictError(message, conflictState)
     }
     throw new CloudRequestError(message, response.status)
   }
 
-  if (!isCloudState(body)) {
+  const state = normalizeCloudState(body)
+  if (!state) {
     throw new CloudRequestError('The cloud returned an invalid state response.', 502)
   }
-  return body
+  return state
 }
 
 export class CloudConflictError extends Error {
@@ -103,15 +106,29 @@ export class CloudConflictError extends Error {
   }
 }
 
-function isCloudState(value: unknown): value is CloudState {
-  if (typeof value !== 'object' || value === null) return false
+function normalizeCloudState(value: unknown): CloudState | null {
+  if (typeof value !== 'object' || value === null) return null
   const candidate = value as Partial<CloudState>
-  return (
+  if (
     Array.isArray(candidate.rounds) &&
     Array.isArray(candidate.courses) &&
     Array.isArray(candidate.deletedCourseKeys) &&
+    (candidate.clubs === undefined ||
+      (Array.isArray(candidate.clubs) &&
+        candidate.clubs.every((club) => typeof club === 'string'))) &&
     Number.isSafeInteger(candidate.revision) &&
     (typeof candidate.updatedAt === 'string' || candidate.updatedAt === null) &&
     typeof candidate.exists === 'boolean'
-  )
+  ) {
+    return {
+      rounds: candidate.rounds,
+      courses: candidate.courses,
+      deletedCourseKeys: candidate.deletedCourseKeys,
+      clubs: candidate.clubs ?? [...CLUB_OPTIONS],
+      revision: candidate.revision as number,
+      updatedAt: candidate.updatedAt,
+      exists: candidate.exists,
+    }
+  }
+  return null
 }

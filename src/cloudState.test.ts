@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { decideBootstrap, stateFingerprint, type CloudState, type LocalState } from './cloudState'
 
-const emptyLocal: LocalState = { rounds: [], courses: [], deletedCourseKeys: [] }
+const emptyLocal: LocalState = {
+  rounds: [],
+  courses: [],
+  deletedCourseKeys: [],
+  clubs: [],
+}
 
 function cloud(overrides: Partial<CloudState> = {}): CloudState {
   return {
@@ -35,6 +40,9 @@ describe('cloud bootstrap decisions', () => {
     expect(stateFingerprint(emptyLocal)).toBe(stateFingerprint({ ...emptyLocal }))
     expect(
       stateFingerprint({ ...emptyLocal, deletedCourseKeys: ['course::tee'] }),
+    ).not.toBe(stateFingerprint(emptyLocal))
+    expect(
+      stateFingerprint({ ...emptyLocal, clubs: ['Driver'] }),
     ).not.toBe(stateFingerprint(emptyLocal))
   })
 })

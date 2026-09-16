@@ -2,6 +2,7 @@ export interface StatePayload {
   rounds: unknown[]
   courses: unknown[]
   deletedCourseKeys: string[]
+  clubs?: string[]
   revision: number
 }
 
@@ -21,17 +22,24 @@ const MAX_BODY_BYTES = 900_000
 const MAX_ROUNDS = 5_000
 const MAX_COURSES = 1_000
 const MAX_DELETED_KEYS = 5_000
+const MAX_CLUBS = 100
 
 export function validateStatePayload(value: unknown): StatePayload {
   if (!isRecord(value)) throw new ValidationError('Request body must be an object.')
 
-  const allowedKeys = new Set(['rounds', 'courses', 'deletedCourseKeys', 'revision'])
+  const allowedKeys = new Set([
+    'rounds',
+    'courses',
+    'deletedCourseKeys',
+    'clubs',
+    'revision',
+  ])
   const unexpectedKey = Object.keys(value).find((key) => !allowedKeys.has(key))
   if (unexpectedKey) {
     throw new ValidationError(`Unexpected property: ${unexpectedKey}.`)
   }
 
-  const { rounds, courses, deletedCourseKeys, revision } = value
+  const { rounds, courses, deletedCourseKeys, clubs, revision } = value
   if (!Array.isArray(rounds) || !rounds.every(isRound)) {
     throw new ValidationError('rounds contains an invalid round.')
   }
@@ -48,6 +56,21 @@ export function validateStatePayload(value: unknown): StatePayload {
   }
   if (!Number.isSafeInteger(revision) || (revision as number) < 0) {
     throw new ValidationError('revision must be a non-negative integer.')
+  }
+  if (
+    clubs !== undefined &&
+    (!Array.isArray(clubs) ||
+      clubs.length > MAX_CLUBS ||
+      !clubs.every(
+        (club) =>
+          isShortString(club, 40) &&
+          club === club.trim(),
+      ) ||
+      new Set(clubs.map((club) => club.toLocaleLowerCase())).size !== clubs.length)
+  ) {
+    throw new ValidationError(
+      'clubs must contain unique, trimmed names of 40 characters or fewer.',
+    )
   }
   if (rounds.length > MAX_ROUNDS) throw new ValidationError('Too many rounds.')
   if (courses.length > MAX_COURSES) throw new ValidationError('Too many courses.')
@@ -69,6 +92,7 @@ export function validateStatePayload(value: unknown): StatePayload {
     rounds,
     courses,
     deletedCourseKeys,
+    ...(clubs === undefined ? {} : { clubs }),
     revision: revision as number,
   }
 }
@@ -82,6 +106,7 @@ export function toStateResponse(
       rounds: [],
       courses: [],
       deletedCourseKeys: [],
+      clubs: undefined,
       revision: 0,
       updatedAt: null,
       exists: false,
@@ -92,6 +117,7 @@ export function toStateResponse(
     rounds: state.rounds,
     courses: state.courses,
     deletedCourseKeys: state.deletedCourseKeys,
+    clubs: state.clubs,
     revision: state.revision,
     updatedAt: state.updatedAt,
     exists,

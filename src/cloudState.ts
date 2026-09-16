@@ -4,6 +4,7 @@ export interface LocalState {
   rounds: Round[]
   courses: CourseTemplate[]
   deletedCourseKeys: string[]
+  clubs: string[]
 }
 
 export interface CloudState extends LocalState {
@@ -30,6 +31,7 @@ export function decideBootstrap(
       rounds: cloudState.rounds,
       courses: cloudState.courses,
       deletedCourseKeys: cloudState.deletedCourseKeys,
+      clubs: cloudState.clubs,
     },
     revision: cloudState.revision,
   }
@@ -39,10 +41,16 @@ export function hasLocalData(state: LocalState): boolean {
   return (
     state.rounds.length > 0 ||
     state.courses.length > 0 ||
-    state.deletedCourseKeys.length > 0
+    state.deletedCourseKeys.length > 0 ||
+    state.clubs.length > 0
   )
 }
 
 export function stateFingerprint(state: LocalState): string {
-  return JSON.stringify([state.rounds, state.courses, state.deletedCourseKeys])
+  return JSON.stringify([
+    state.rounds,
+    state.courses,
+    state.deletedCourseKeys,
+    state.clubs,
+  ])
 }
