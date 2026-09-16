@@ -976,6 +976,19 @@ select:focus {
   margin-top: 3px;
 }
 
+.hole-sg-total {
+  align-items: center;
+  border-top: 2px solid var(--line);
+  display: flex;
+  font-weight: 800;
+  justify-content: space-between;
+  padding: 16px 0 0;
+}
+
+.hole-sg-total strong {
+  font-size: 20px;
+}
+
 .icon-button {
   background: transparent;
   border: 0;

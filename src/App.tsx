@@ -681,6 +681,13 @@ function RoundEntry({
   const metrics = calculateRound(round)
   const liveStrokesGained =
     metrics.totalShots === 0 ? 0 : metrics.totalStrokesGained
+  const holeShotResults = hole.shots.map((shot, index) =>
+    calculateShot(shot, index, hole.par),
+  )
+  const holeStrokesGained =
+    isHoleComplete && holeShotResults.every((result) => result.strokesGained !== null)
+      ? holeShotResults.reduce((sum, result) => sum + (result.strokesGained ?? 0), 0)
+      : null
 
   useEffect(() => {
     if (hole.shots.length === 0 || needsHoleSetup) return
@@ -858,7 +865,7 @@ function RoundEntry({
             <div className="shot-timeline card">
               <h2>Shot history</h2>
               {hole.shots.map((shot, index) => {
-                const result = calculateShot(shot, index, hole.par)
+                const result = holeShotResults[index]
                 return (
                   <div className="shot-row" key={shot.id}>
                     <span className="shot-number">{index + 1}</span>
@@ -884,6 +891,22 @@ function RoundEntry({
                   </div>
                 )
               })}
+              {isHoleComplete && (
+                <div className="hole-sg-total">
+                  <span>Hole strokes gained</span>
+                  <strong
+                    className={
+                      holeStrokesGained === null
+                        ? 'unsupported'
+                        : holeStrokesGained >= 0
+                          ? 'positive'
+                          : 'negative'
+                    }
+                  >
+                    {formatMetric(holeStrokesGained)}
+                  </strong>
+                </div>
+              )}
             </div>
           )}
         </div>
