@@ -1106,6 +1106,10 @@ select:focus {
   width: 7px;
 }
 
+.hole-tabs button.complete.synced::after {
+  background: var(--green);
+}
+
 .hole-tabs button.active {
   background: var(--green);
   border-color: var(--green);

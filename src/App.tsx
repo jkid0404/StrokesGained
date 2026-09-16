@@ -292,6 +292,9 @@ function App() {
             key={`${activeRound.id}-${activeHoleIndex}-${activeRound.holes[activeHoleIndex]?.shots.length ?? 0}`}
             round={activeRound}
             activeHoleIndex={Math.max(0, activeHoleIndex)}
+            isCloudSynced={
+              cloud.syncStatus === 'saved' && cloud.pendingChanges === 0
+            }
             onHoleChange={setActiveHoleIndex}
             onChange={upsertRound}
             onHoleDetailsChange={updateCourseHole}
@@ -689,6 +692,7 @@ function RoundSetup({
 function RoundEntry({
   round,
   activeHoleIndex,
+  isCloudSynced,
   onHoleChange,
   onChange,
   onHoleDetailsChange,
@@ -696,6 +700,7 @@ function RoundEntry({
 }: {
   round: Round
   activeHoleIndex: number
+  isCloudSynced: boolean
   onHoleChange: (index: number) => void
   onChange: (round: Round) => void
   onHoleDetailsChange: (courseName: string, teeName: string, hole: Hole) => void
@@ -913,12 +918,14 @@ function RoundEntry({
               <button
                 aria-label={
                   isComplete
-                    ? `Hole ${item.number}, strokes gained ${formatMetric(strokesGained)}`
+                    ? `Hole ${item.number}, strokes gained ${formatMetric(
+                        strokesGained,
+                      )}, ${isCloudSynced ? 'synced to Azure' : 'sync pending'}`
                     : `Hole ${item.number}`
                 }
                 className={`${index === activeHoleIndex ? 'active' : ''} ${
                   isComplete ? 'complete' : ''
-                }`}
+                } ${isComplete && isCloudSynced ? 'synced' : ''}`}
                 type="button"
                 onClick={() => onHoleChange(index)}
               >
