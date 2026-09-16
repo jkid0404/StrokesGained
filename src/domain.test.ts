@@ -57,6 +57,9 @@ describe('Kaggle benchmark', () => {
     expect(() => expectedStrokes({ lie: 'fairway', distance: 601, unit: 'yards' })).toThrow(
       'supports 3-600 yd',
     )
+    expect(() => expectedStrokes({ lie: 'recovery', distance: 100, unit: 'yards' })).toThrow(
+      'Recovery shots are not supported',
+    )
   })
 })
 

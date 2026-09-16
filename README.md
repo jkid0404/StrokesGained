@@ -140,8 +140,8 @@ Values](https://www.kaggle.com/datasets/evancallaghan/pga-tour-strokes-gained-ba
 - Fairway, rough, and sand coverage: 3-600 yards.
 - Putting coverage: 1-90 feet.
 - Decimal distances use linear interpolation between adjacent CSV rows.
-- Recovery remains calculation-only for legacy rounds because the Kaggle data
-  has no recovery column.
+- Recovery shots are unsupported because the Kaggle data has no recovery
+  column.
 - Inputs outside the source ranges are rejected rather than extrapolated.
 
 The dataset author says values were aggregated from Mark Broadie's *Every Shot

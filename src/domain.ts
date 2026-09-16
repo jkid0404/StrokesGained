@@ -1,3 +1,8 @@
+import {
+  KAGGLE_BASELINES,
+  type BaselineAnchor,
+} from './data/baselineData'
+
 export type Lie =
   | 'tee'
   | 'fairway'
@@ -177,113 +182,13 @@ export const LIE_LABELS: Record<Lie, string> = {
   holed: 'Holed',
 }
 
-type Anchor = BaselineAnchor
+type SupportedBenchmarkLie = Exclude<Lie, 'holed' | 'recovery'>
 
-const LEGACY_BENCHMARKS: Record<Exclude<Lie, 'holed'>, Anchor[]> = {
-  tee: [
-    { distance: 1, expected: 1.95 },
-    { distance: 5, expected: 2.05 },
-    { distance: 10, expected: 2.18 },
-    { distance: 15, expected: 2.3 },
-    { distance: 20, expected: 2.4 },
-    { distance: 100, expected: 2.92 },
-    { distance: 400, expected: 3.99 },
-    { distance: 450, expected: 4.2 },
-    { distance: 500, expected: 4.41 },
-    { distance: 550, expected: 4.62 },
-    { distance: 600, expected: 4.83 },
-    { distance: 650, expected: 5.04 },
-    { distance: 700, expected: 5.25 },
-  ],
-  fairway: [
-    { distance: 1, expected: 1.95 },
-    { distance: 5, expected: 2.05 },
-    { distance: 10, expected: 2.18 },
-    { distance: 15, expected: 2.3 },
-    { distance: 20, expected: 2.4 },
-    { distance: 100, expected: 2.8 },
-    { distance: 400, expected: 4.11 },
-    { distance: 450, expected: 4.31 },
-    { distance: 500, expected: 4.51 },
-    { distance: 550, expected: 4.71 },
-    { distance: 600, expected: 4.91 },
-    { distance: 650, expected: 5.11 },
-    { distance: 700, expected: 5.31 },
-  ],
-  rough: [
-    { distance: 1, expected: 2.05 },
-    { distance: 5, expected: 2.17 },
-    { distance: 10, expected: 2.32 },
-    { distance: 15, expected: 2.46 },
-    { distance: 20, expected: 2.59 },
-    { distance: 100, expected: 3.02 },
-    { distance: 400, expected: 4.3 },
-    { distance: 450, expected: 4.53 },
-    { distance: 500, expected: 4.75 },
-    { distance: 550, expected: 4.98 },
-    { distance: 600, expected: 5.2 },
-    { distance: 650, expected: 5.43 },
-    { distance: 700, expected: 5.65 },
-  ],
-  sand: [
-    { distance: 1, expected: 2.15 },
-    { distance: 5, expected: 2.27 },
-    { distance: 10, expected: 2.38 },
-    { distance: 15, expected: 2.46 },
-    { distance: 20, expected: 2.53 },
-    { distance: 100, expected: 3.23 },
-    { distance: 400, expected: 4.69 },
-    { distance: 450, expected: 4.92 },
-    { distance: 500, expected: 5.14 },
-    { distance: 550, expected: 5.37 },
-    { distance: 600, expected: 5.59 },
-    { distance: 650, expected: 5.82 },
-    { distance: 700, expected: 6.04 },
-  ],
-  recovery: [
-    { distance: 1, expected: 2.7 },
-    { distance: 5, expected: 2.9 },
-    { distance: 10, expected: 3.15 },
-    { distance: 15, expected: 3.35 },
-    { distance: 20, expected: 3.51 },
-    { distance: 100, expected: 3.8 },
-    { distance: 400, expected: 4.75 },
-    { distance: 450, expected: 4.98 },
-    { distance: 500, expected: 5.2 },
-    { distance: 550, expected: 5.43 },
-    { distance: 600, expected: 5.65 },
-    { distance: 650, expected: 5.88 },
-    { distance: 700, expected: 6.1 },
-  ],
-  green: [
-    { distance: 1, expected: 1.0 },
-    { distance: 2, expected: 1.01 },
-    { distance: 3, expected: 1.05 },
-    { distance: 4, expected: 1.14 },
-    { distance: 5, expected: 1.24 },
-    { distance: 6, expected: 1.33 },
-    { distance: 8, expected: 1.5 },
-    { distance: 10, expected: 1.61 },
-    { distance: 15, expected: 1.78 },
-    { distance: 20, expected: 1.87 },
-    { distance: 25, expected: 1.93 },
-    { distance: 33, expected: 2.0 },
-    { distance: 40, expected: 2.06 },
-    { distance: 50, expected: 2.14 },
-    { distance: 60, expected: 2.21 },
-    { distance: 75, expected: 2.3 },
-    { distance: 90, expected: 2.39 },
-    { distance: 120, expected: 2.55 },
-  ],
-}
-
-const BENCHMARKS: Record<Exclude<Lie, 'holed'>, Anchor[]> = {
-  ...KAGGLE_BASELINES,
-  recovery: LEGACY_BENCHMARKS.recovery,
-}
+const BENCHMARKS: Record<SupportedBenchmarkLie, BaselineAnchor[]> = KAGGLE_BASELINES
 
 export function benchmarkRange(lie: Lie): string {
   if (lie === 'holed') return '0'
+  if (lie === 'recovery') return 'unsupported'
   const anchors = BENCHMARKS[lie]
   const unit = lie === 'green' ? 'ft' : 'yd'
   return `${anchors[0].distance}-${anchors.at(-1)!.distance} ${unit}`
@@ -291,6 +196,9 @@ export function benchmarkRange(lie: Lie): string {
 
 export function expectedStrokes(position: Position): number {
   if (position.lie === 'holed') return 0
+  if (position.lie === 'recovery') {
+    throw new Error('Recovery shots are not supported by the active benchmark.')
+  }
 
   const expectedUnit = position.lie === 'green' ? 'feet' : 'yards'
   if (position.unit !== expectedUnit) {
@@ -505,7 +413,3 @@ export function formatMetric(value: number | null, digits = 2): string {
   if (value === null) return 'N/A'
   return `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`
 }
-import {
-  KAGGLE_BASELINES,
-  type BaselineAnchor,
-} from './data/baselineData'
