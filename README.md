@@ -7,7 +7,9 @@ and tee templates, wrapped starting-hole order, historical round snapshots, and
 all existing localStorage data remain supported. The Trends page charts total
 or category strokes gained across the last 5, 10, or 20 matching rounds and
 supports course, tee, date, round-length, and category filters with course/tee
-comparison splits.
+comparison splits. Shots can optionally record a club and short note, and the
+filtered Trends view summarizes club usage, starting distance, average SG per
+shot, and total SG.
 
 When hosted on Azure Static Web Apps, the app adds private cross-device sync:
 

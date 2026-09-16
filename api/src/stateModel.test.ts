@@ -87,4 +87,50 @@ describe('cloud state validation', () => {
       }),
     ).toThrow(ValidationError)
   })
+
+  it('accepts optional club and note fields and enforces their limits', () => {
+    const shot = {
+      id: 'shot-1',
+      start: { lie: 'fairway', distance: 150, unit: 'yards' },
+      finish: { lie: 'green', distance: 15, unit: 'feet' },
+      penaltyStrokes: 0,
+      club: '7 iron',
+      note: 'Into the wind',
+    }
+    const payload = {
+      rounds: [
+        {
+          id: 'round-1',
+          courseName: 'Test course',
+          teeName: 'Blue',
+          playedOn: '2026-09-15',
+          createdAt: '2026-09-15T12:00:00Z',
+          status: 'complete',
+          benchmarkVersion: 'kaggle-evancallaghan-v1-2023',
+          holes: [{ number: 1, par: 4, yardage: 400, shots: [shot] }],
+        },
+      ],
+      courses: [],
+      deletedCourseKeys: [],
+      revision: 0,
+    }
+
+    expect(validateStatePayload(payload)).toMatchObject({ revision: 0 })
+    expect(() =>
+      validateStatePayload({
+        ...payload,
+        rounds: [
+          {
+            ...payload.rounds[0],
+            holes: [
+              {
+                ...payload.rounds[0].holes[0],
+                shots: [{ ...shot, note: 'x'.repeat(301) }],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(ValidationError)
+  })
 })

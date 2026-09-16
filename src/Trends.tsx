@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
+  buildClubAnalytics,
   buildCourseSplits,
   buildTrendPoints,
   filterTrendRounds,
@@ -67,6 +68,7 @@ export function Trends({ rounds }: { rounds: Round[] }) {
   const points = buildTrendPoints(displayedRounds, category)
   const personalReference = personalTrendReference(filteredRounds, category)
   const splits = buildCourseSplits(displayedRounds, category)
+  const clubMetrics = buildClubAnalytics(displayedRounds, category)
   const values = points.flatMap((point) => (point.value === null ? [] : [point.value]))
   const average = values.length
     ? values.reduce((sum, value) => sum + value, 0) / values.length
@@ -238,6 +240,63 @@ export function Trends({ rounds }: { rounds: Round[] }) {
                     </strong>
                     <strong className={split.best >= 0 ? 'positive' : 'negative'}>
                       {formatMetric(split.best)}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="card club-analytics-card">
+            <div className="section-heading compact-heading">
+              <div>
+                <span className="eyebrow">Club analytics</span>
+                <h2>Performance by club</h2>
+              </div>
+              <span className="pill">{CATEGORY_LABELS[category as ShotCategory] ?? 'All shots'}</span>
+            </div>
+            {clubMetrics.length === 0 ? (
+              <p className="muted split-empty">
+                Record clubs on shots to compare their strokes-gained performance.
+              </p>
+            ) : (
+              <div className="club-analytics-table">
+                <div className="club-analytics-row table-header">
+                  <span>Club</span>
+                  <span>Shots</span>
+                  <span>Avg start</span>
+                  <span>SG / shot</span>
+                  <span>Total SG</span>
+                </div>
+                {clubMetrics.map((metric) => (
+                  <div className="club-analytics-row" key={metric.key}>
+                    <span>
+                      <strong>{metric.club}</strong>
+                      <small>
+                        {metric.shots < 5 ? 'Small sample' : 'Established sample'}
+                      </small>
+                    </span>
+                    <span>{metric.shots}</span>
+                    <span>
+                      {metric.averageDistance === null || metric.distanceUnit === null
+                        ? 'Mixed'
+                        : `${metric.averageDistance.toFixed(0)} ${
+                            metric.distanceUnit === 'feet' ? 'ft' : 'yd'
+                          }`}
+                    </span>
+                    <strong
+                      className={
+                        metric.averageStrokesGained >= 0 ? 'positive' : 'negative'
+                      }
+                    >
+                      {formatMetric(metric.averageStrokesGained)}
+                    </strong>
+                    <strong
+                      className={
+                        metric.totalStrokesGained >= 0 ? 'positive' : 'negative'
+                      }
+                    >
+                      {formatMetric(metric.totalStrokesGained)}
                     </strong>
                   </div>
                 ))}

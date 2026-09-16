@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BENCHMARK_VERSION,
+  CLUB_OPTIONS,
   buildCourseTemplates,
   buildHoleSequence,
   buildPersonalBaseline,
@@ -8,6 +9,7 @@ import {
   calculateShot,
   calculateCumulativeMetrics,
   defaultFinishLie,
+  defaultClub,
   expectedStrokes,
   excludeDeletedCourseTemplates,
   mergeCourseTemplates,
@@ -109,6 +111,21 @@ describe('default finishing lie', () => {
     expect(
       defaultFinishLie(5, 2, { lie: 'rough', distance: 80, unit: 'yards' }, 'sand'),
     ).toBe('sand')
+  })
+})
+
+describe('default club', () => {
+  it('uses contextual and recently selected club defaults', () => {
+    expect(CLUB_OPTIONS).toContain('Putter')
+    expect(
+      defaultClub({ lie: 'green', distance: 12, unit: 'feet' }, '3 wood', '7 iron'),
+    ).toBe('Putter')
+    expect(
+      defaultClub({ lie: 'tee', distance: 400, unit: 'yards' }, '3 wood', '7 iron'),
+    ).toBe('3 wood')
+    expect(
+      defaultClub({ lie: 'rough', distance: 150, unit: 'yards' }, 'Driver', '7 iron'),
+    ).toBe('7 iron')
   })
 })
 

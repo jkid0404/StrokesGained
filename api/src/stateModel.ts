@@ -139,7 +139,9 @@ function isShot(value: unknown): boolean {
     isShortString(value.id, 200) &&
     isPosition(value.start) &&
     isPosition(value.finish) &&
-    isIntegerInRange(value.penaltyStrokes, 0, 20)
+    isIntegerInRange(value.penaltyStrokes, 0, 20) &&
+    (value.club === undefined || isShortString(value.club, 40)) &&
+    (value.note === undefined || isShortString(value.note, 300))
   )
 }
 

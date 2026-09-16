@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildClubAnalytics,
   buildCourseSplits,
   filterTrendRounds,
   personalTrendReference,
@@ -73,6 +74,21 @@ describe('trend analytics', () => {
 
     expect(personalTrendReference(rounds, 'total')).not.toBeNull()
     expect(personalTrendReference(rounds, 'off-the-tee')).not.toBeNull()
+  })
+
+  it('aggregates supported strokes gained by recorded club and category', () => {
+    const round = makeRound('round', 'Alpha', 'Blue', '2026-01-01', 9, 400)
+    round.holes.forEach((hole, index) => {
+      hole.shots[0].club = index < 6 ? 'Driver' : '3 wood'
+    })
+
+    const metrics = buildClubAnalytics([round], 'off-the-tee')
+    expect(metrics.map((metric) => [metric.club, metric.shots])).toEqual([
+      ['Driver', 6],
+      ['3 wood', 3],
+    ])
+    expect(metrics[0].averageDistance).toBe(400)
+    expect(metrics[0].distanceUnit).toBe('yards')
   })
 })
 

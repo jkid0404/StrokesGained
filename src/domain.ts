@@ -29,6 +29,8 @@ export interface Shot {
   start: Position
   finish: Position
   penaltyStrokes: number
+  club?: string
+  note?: string
 }
 
 export interface Hole {
@@ -103,6 +105,29 @@ export interface CumulativeMetrics {
 }
 
 export const BENCHMARK_VERSION = 'kaggle-evancallaghan-v1-2023'
+
+export const CLUB_OPTIONS = [
+  'Driver',
+  '3 wood',
+  '5 wood',
+  '7 wood',
+  '2 hybrid',
+  '3 hybrid',
+  '4 hybrid',
+  'Driving iron',
+  '3 iron',
+  '4 iron',
+  '5 iron',
+  '6 iron',
+  '7 iron',
+  '8 iron',
+  '9 iron',
+  'Pitching wedge',
+  'Gap wedge',
+  'Sand wedge',
+  'Lob wedge',
+  'Putter',
+] as const
 
 export function buildHoleSequence(count: 9 | 18, startingHole: number): Hole[] {
   const normalizedStart = Math.min(18, Math.max(1, Math.round(startingHole)))
@@ -241,6 +266,16 @@ export function defaultFinishLie(
   if (start.lie === 'tee') return par === 3 ? 'green' : 'fairway'
   if ((par === 4 || par === 5) && shotIndex === 1) return 'green'
   return mostRecentlySelectedLie
+}
+
+export function defaultClub(
+  start: Position,
+  mostRecentTeeClub: string,
+  mostRecentOtherClub: string,
+): string {
+  if (start.lie === 'green') return 'Putter'
+  if (start.lie === 'tee') return mostRecentTeeClub
+  return mostRecentOtherClub
 }
 
 export function calculateShot(shot: Shot, shotIndex: number, par: number): ShotResult {

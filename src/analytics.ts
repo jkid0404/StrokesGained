@@ -1,6 +1,7 @@
 import {
   buildPersonalBaseline,
   calculateRound,
+  calculateShot,
   courseKey,
   type Round,
   type ShotCategory,
@@ -29,6 +30,16 @@ export interface CourseSplit {
   rounds: number
   average: number
   best: number
+}
+
+export interface ClubMetric {
+  key: string
+  club: string
+  shots: number
+  averageDistance: number | null
+  distanceUnit: 'yards' | 'feet' | null
+  averageStrokesGained: number
+  totalStrokesGained: number
 }
 
 export function filterTrendRounds(rounds: Round[], filters: TrendFilters): Round[] {
@@ -109,6 +120,70 @@ export function buildCourseSplits(
       best: Math.max(...group.values),
     }))
     .sort((a, b) => b.average - a.average || a.courseName.localeCompare(b.courseName))
+}
+
+export function buildClubAnalytics(
+  rounds: Round[],
+  category: TrendCategory,
+): ClubMetric[] {
+  const groups = new Map<
+    string,
+    {
+      club: string
+      strokesGained: number[]
+      distances: number[]
+      units: Set<'yards' | 'feet'>
+    }
+  >()
+
+  for (const round of rounds) {
+    for (const hole of round.holes) {
+      hole.shots.forEach((shot, shotIndex) => {
+        const club = shot.club?.trim()
+        if (!club) return
+
+        const result = calculateShot(shot, shotIndex, hole.par)
+        if (result.strokesGained === null) return
+        if (category !== 'total' && result.category !== category) return
+
+        const key = club.toLocaleLowerCase()
+        const group = groups.get(key) ?? {
+          club,
+          strokesGained: [],
+          distances: [],
+          units: new Set<'yards' | 'feet'>(),
+        }
+        group.strokesGained.push(result.strokesGained)
+        group.distances.push(shot.start.distance)
+        group.units.add(shot.start.unit)
+        groups.set(key, group)
+      })
+    }
+  }
+
+  return [...groups.entries()]
+    .map(([key, group]) => {
+      const totalStrokesGained = group.strokesGained.reduce(
+        (sum, value) => sum + value,
+        0,
+      )
+      const hasOneUnit = group.units.size === 1
+      return {
+        key,
+        club: group.club,
+        shots: group.strokesGained.length,
+        averageDistance: hasOneUnit ? mean(group.distances) : null,
+        distanceUnit: hasOneUnit ? [...group.units][0] : null,
+        averageStrokesGained: totalStrokesGained / group.strokesGained.length,
+        totalStrokesGained,
+      }
+    })
+    .sort(
+      (a, b) =>
+        b.shots - a.shots ||
+        b.averageStrokesGained - a.averageStrokesGained ||
+        a.club.localeCompare(b.club),
+    )
 }
 
 function normalizedTeeName(round: Round): string {

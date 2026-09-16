@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import {
   BENCHMARK_VERSION,
+  CLUB_OPTIONS,
   LIE_LABELS,
   benchmarkRange,
   buildCourseTemplates,
@@ -12,6 +13,7 @@ import {
   calculateShot,
   courseKey,
   createId,
+  defaultClub,
   defaultFinishLie,
   excludeDeletedCourseTemplates,
   formatMetric,
@@ -21,6 +23,7 @@ import {
   type Lie,
   type Position,
   type Round,
+  type Shot,
   type ShotCategory,
 } from './domain'
 import {
@@ -289,7 +292,7 @@ function App() {
         {view === 'trends' && <Trends rounds={rounds} />}
         {view === 'entry' && activeRound && (
           <RoundEntry
-            key={`${activeRound.id}-${activeHoleIndex}-${activeRound.holes[activeHoleIndex]?.shots.length ?? 0}`}
+            key={activeRound.id}
             round={activeRound}
             activeHoleIndex={Math.max(0, activeHoleIndex)}
             isCloudSynced={
@@ -715,6 +718,8 @@ function RoundEntry({
   const startDistance = start.distance
   const startUnit = start.unit
   const mostRecentFinishLie = useRef<Lie>('fairway')
+  const mostRecentTeeClub = useRef('Driver')
+  const mostRecentOtherClub = useRef('')
   const initialFinishLie = defaultFinishLie(
     hole.par,
     hole.shots.length,
@@ -724,6 +729,8 @@ function RoundEntry({
   const [finishLie, setFinishLie] = useState<Lie>(initialFinishLie)
   const [distance, setDistance] = useState(initialFinishLie === 'green' ? '8' : '100')
   const [penaltyStrokes, setPenaltyStrokes] = useState(0)
+  const [club, setClub] = useState(() => defaultClub(start, 'Driver', ''))
+  const [note, setNote] = useState('')
   const [formError, setFormError] = useState('')
   const [editingHoleDetails, setEditingHoleDetails] = useState(false)
   const shotCardRef = useRef<HTMLDivElement>(null)
@@ -746,7 +753,16 @@ function RoundEntry({
     setFinishLie(nextFinishLie)
     setDistance(nextFinishLie === 'green' ? '8' : '100')
     setPenaltyStrokes(0)
+    setClub(
+      defaultClub(
+        { lie: startLie, distance: startDistance, unit: startUnit },
+        mostRecentTeeClub.current,
+        mostRecentOtherClub.current,
+      ),
+    )
+    setNote('')
     setFormError('')
+    setEditingHoleDetails(false)
   }, [activeHoleIndex, hole.par, hole.shots.length, startDistance, startLie, startUnit])
 
   useEffect(() => {
@@ -811,7 +827,16 @@ function RoundEntry({
             unit: finishLie === 'green' ? 'feet' : 'yards',
           }
 
-    const shot = { id: createId('shot'), start, finish, penaltyStrokes }
+    const trimmedClub = club.trim()
+    const trimmedNote = note.trim()
+    const shot: Shot = {
+      id: createId('shot'),
+      start,
+      finish,
+      penaltyStrokes,
+      ...(trimmedClub ? { club: trimmedClub } : {}),
+      ...(trimmedNote ? { note: trimmedNote } : {}),
+    }
     const result = calculateShot(shot, hole.shots.length, hole.par)
     if (result.error) {
       setFormError(result.error)
@@ -1002,6 +1027,11 @@ function RoundEntry({
                           : ''}
                         {shot.penaltyStrokes ? ` · +${shot.penaltyStrokes} penalty` : ''}
                       </small>
+                      {(shot.club || shot.note) && (
+                        <small className="shot-metadata">
+                          {[shot.club, shot.note].filter(Boolean).join(' · ')}
+                        </small>
+                      )}
                     </span>
                     <strong className={result.strokesGained !== null && result.strokesGained >= 0 ? 'positive' : 'negative'}>
                       {formatMetric(result.strokesGained)}
@@ -1106,6 +1136,49 @@ function RoundEntry({
                   <option value="2">2 strokes</option>
                 </select>
               </label>
+
+              <details className="shot-optional-details">
+                <summary>
+                  {club ? `Club: ${club}` : 'Add club'}
+                  {note ? ' · Note added' : ' · Add note'}
+                </summary>
+                <div className="shot-optional-fields">
+                  <label>
+                    Club
+                    <input
+                      list="club-options"
+                      maxLength={40}
+                      placeholder="No club recorded"
+                      value={club}
+                      onChange={(event) => {
+                        const nextClub = event.target.value
+                        setClub(nextClub)
+                        if (start.lie === 'tee') {
+                          mostRecentTeeClub.current = nextClub
+                        } else if (nextClub !== 'Putter') {
+                          mostRecentOtherClub.current = nextClub
+                        }
+                      }}
+                    />
+                    <datalist id="club-options">
+                      {CLUB_OPTIONS.map((option) => (
+                        <option value={option} key={option} />
+                      ))}
+                    </datalist>
+                  </label>
+                  <label>
+                    Shot note
+                    <textarea
+                      maxLength={300}
+                      placeholder="Optional, e.g. into wind or pulled left"
+                      rows={3}
+                      value={note}
+                      onChange={(event) => setNote(event.target.value)}
+                    />
+                    <small>{note.length}/300</small>
+                  </label>
+                </div>
+              </details>
 
               {formError && <div className="error-message">{formError}</div>}
               <button
