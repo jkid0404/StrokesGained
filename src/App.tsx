@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import {
   BENCHMARK_VERSION,
@@ -677,9 +677,23 @@ function RoundEntry({
   const [penaltyStrokes, setPenaltyStrokes] = useState(0)
   const [formError, setFormError] = useState('')
   const [editingHoleDetails, setEditingHoleDetails] = useState(false)
+  const shotCardRef = useRef<HTMLDivElement>(null)
   const metrics = calculateRound(round)
   const liveStrokesGained =
     metrics.totalShots === 0 ? 0 : metrics.totalStrokesGained
+
+  useEffect(() => {
+    if (hole.shots.length === 0 || needsHoleSetup) return
+    if (!window.matchMedia('(max-width: 800px)').matches) return
+
+    const timer = window.setTimeout(() => {
+      shotCardRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      })
+    }, 180)
+    return () => window.clearTimeout(timer)
+  }, [hole.shots.length, needsHoleSetup])
 
   function addShot(event: React.FormEvent) {
     event.preventDefault()
@@ -709,9 +723,6 @@ function RoundEntry({
       index === activeHoleIndex ? { ...item, shots: [...item.shots, shot] } : item,
     )
     onChange({ ...round, holes: updatedHoles })
-    if (finish.lie === 'holed' && activeHoleIndex < round.holes.length - 1) {
-      onHoleChange(activeHoleIndex + 1)
-    }
   }
 
   function truncateShots(index: number) {
@@ -877,7 +888,7 @@ function RoundEntry({
           )}
         </div>
 
-        <div className="card shot-form-card">
+        <div className="card shot-form-card" ref={shotCardRef}>
           {isHoleComplete ? (
             <div className="complete-panel">
               <span className="complete-check">✓</span>
