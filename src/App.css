@@ -20,6 +20,7 @@ button,
 input,
 select {
   font: inherit;
+  touch-action: manipulation;
 }
 
 button {
@@ -575,6 +576,8 @@ select {
   border: 1px solid #cbd6ce;
   border-radius: 10px;
   color: var(--ink);
+  font-size: 16px;
+  line-height: 1.25;
   min-height: 46px;
   padding: 9px 12px;
   width: 100%;
@@ -1226,6 +1229,7 @@ select:focus {
 
   .shot-form-card {
     position: static;
+    scroll-margin-top: 84px;
   }
 
   .hole-summary {
