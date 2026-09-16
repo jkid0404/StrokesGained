@@ -44,6 +44,15 @@ const CATEGORY_LABELS: Record<ShotCategory, string> = {
 
 const PLAYABLE_LIES: Lie[] = ['fairway', 'rough', 'sand', 'green', 'holed']
 
+function calculateHoleStrokesGained(hole: Hole): number | null {
+  if (hole.shots.at(-1)?.finish.lie !== 'holed') return null
+
+  const results = hole.shots.map((shot, index) => calculateShot(shot, index, hole.par))
+  if (results.some((result) => result.strokesGained === null)) return null
+
+  return results.reduce((sum, result) => sum + (result.strokesGained ?? 0), 0)
+}
+
 function App() {
   const [rounds, setRounds] = useState<Round[]>(loadRounds)
   const [courses, setCourses] = useState<CourseTemplate[]>(() =>
@@ -684,10 +693,7 @@ function RoundEntry({
   const holeShotResults = hole.shots.map((shot, index) =>
     calculateShot(shot, index, hole.par),
   )
-  const holeStrokesGained =
-    isHoleComplete && holeShotResults.every((result) => result.strokesGained !== null)
-      ? holeShotResults.reduce((sum, result) => sum + (result.strokesGained ?? 0), 0)
-      : null
+  const holeStrokesGained = calculateHoleStrokesGained(hole)
 
   useEffect(() => {
     if (hole.shots.length === 0 || needsHoleSetup) return
@@ -801,18 +807,41 @@ function RoundEntry({
       </div>
 
       <div className="hole-tabs" aria-label="Select hole">
-        {round.holes.map((item, index) => (
-          <button
-            className={`${index === activeHoleIndex ? 'active' : ''} ${
-              item.shots.at(-1)?.finish.lie === 'holed' ? 'complete' : ''
-            }`}
-            type="button"
-            key={item.number}
-            onClick={() => onHoleChange(index)}
-          >
-            {item.number}
-          </button>
-        ))}
+        {round.holes.map((item, index) => {
+          const isComplete = item.shots.at(-1)?.finish.lie === 'holed'
+          const strokesGained = calculateHoleStrokesGained(item)
+          return (
+            <div className="hole-tab" key={item.number}>
+              {isComplete && (
+                <span
+                  className={`hole-tab-sg ${
+                    strokesGained === null
+                      ? 'unsupported'
+                      : strokesGained >= 0
+                        ? 'positive'
+                        : 'negative'
+                  }`}
+                >
+                  {formatMetric(strokesGained)}
+                </span>
+              )}
+              <button
+                aria-label={
+                  isComplete
+                    ? `Hole ${item.number}, strokes gained ${formatMetric(strokesGained)}`
+                    : `Hole ${item.number}`
+                }
+                className={`${index === activeHoleIndex ? 'active' : ''} ${
+                  isComplete ? 'complete' : ''
+                }`}
+                type="button"
+                onClick={() => onHoleChange(index)}
+              >
+                {item.number}
+              </button>
+            </div>
+          )
+        })}
       </div>
 
       <div className="live-category-grid" aria-label="Live strokes gained by category">

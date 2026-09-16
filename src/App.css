@@ -831,11 +831,27 @@ select:focus {
 }
 
 .hole-tabs {
+  align-items: flex-end;
   display: flex;
   gap: 7px;
   margin: 20px 0 26px;
   overflow-x: auto;
   padding-bottom: 4px;
+}
+
+.hole-tab {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hole-tab-sg {
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .hole-tabs button {
