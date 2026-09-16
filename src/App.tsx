@@ -612,7 +612,7 @@ function RoundSetup({
   const [courseName, setCourseName] = useState('')
   const [teeName, setTeeName] = useState('')
   const [playedOn, setPlayedOn] = useState(new Date().toISOString().slice(0, 10))
-  const [holeCount, setHoleCount] = useState<9 | 18>(9)
+  const [holeCount, setHoleCount] = useState<9 | 18>(18)
   const [startingHole, setStartingHole] = useState(1)
 
   function submit(event: React.FormEvent) {
