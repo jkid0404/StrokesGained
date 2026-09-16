@@ -1063,6 +1063,7 @@ select:focus {
   margin: 20px 0 26px;
   overflow-x: auto;
   padding-bottom: 4px;
+  scroll-padding-inline: 50%;
 }
 
 .hole-tab {

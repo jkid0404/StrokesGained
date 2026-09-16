@@ -722,6 +722,7 @@ function RoundEntry({
   const [formError, setFormError] = useState('')
   const [editingHoleDetails, setEditingHoleDetails] = useState(false)
   const shotCardRef = useRef<HTMLDivElement>(null)
+  const holeTabsRef = useRef<HTMLDivElement>(null)
   const metrics = calculateRound(round)
   const liveStrokesGained =
     metrics.totalShots === 0 ? 0 : metrics.totalStrokesGained
@@ -742,6 +743,38 @@ function RoundEntry({
     setPenaltyStrokes(0)
     setFormError('')
   }, [activeHoleIndex, hole.par, hole.shots.length, startDistance, startLie, startUnit])
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const container = holeTabsRef.current
+      const activeTab = container?.querySelector<HTMLElement>(
+        '[data-active-hole="true"]',
+      )
+      if (!container || !activeTab || container.scrollWidth <= container.clientWidth) {
+        return
+      }
+
+      const containerRect = container.getBoundingClientRect()
+      const tabRect = activeTab.getBoundingClientRect()
+      const centeredLeft =
+        container.scrollLeft +
+        tabRect.left -
+        containerRect.left -
+        (container.clientWidth - tabRect.width) / 2
+      const maximumLeft = container.scrollWidth - container.clientWidth
+      const left = Math.min(maximumLeft, Math.max(0, centeredLeft))
+      const reduceMotion = window.matchMedia(
+        '(prefers-reduced-motion: reduce)',
+      ).matches
+
+      container.scrollTo({
+        left,
+        behavior: reduceMotion ? 'auto' : 'smooth',
+      })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeHoleIndex])
 
   useEffect(() => {
     if (hole.shots.length === 0 || needsHoleSetup) return
@@ -854,12 +887,16 @@ function RoundEntry({
         </div>
       </div>
 
-      <div className="hole-tabs" aria-label="Select hole">
+      <div className="hole-tabs" aria-label="Select hole" ref={holeTabsRef}>
         {round.holes.map((item, index) => {
           const isComplete = item.shots.at(-1)?.finish.lie === 'holed'
           const strokesGained = calculateHoleStrokesGained(item)
           return (
-            <div className="hole-tab" key={item.number}>
+            <div
+              className="hole-tab"
+              data-active-hole={index === activeHoleIndex}
+              key={item.number}
+            >
               {isComplete && (
                 <span
                   className={`hole-tab-sg ${
