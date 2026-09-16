@@ -671,6 +671,99 @@ nav {
   color: var(--muted);
 }
 
+.traditional-stats-card {
+  margin: 24px 0;
+  overflow: hidden;
+}
+
+.traditional-stats-card > .section-heading {
+  padding: 0 22px;
+}
+
+.traditional-stat-grid {
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.traditional-stat {
+  border-right: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  padding: 18px;
+}
+
+.traditional-stat:nth-child(-n + 5) {
+  border-top: 0;
+}
+
+.traditional-stat:nth-child(5n) {
+  border-right: 0;
+}
+
+.traditional-stat span,
+.traditional-stat strong,
+.traditional-stat small {
+  display: block;
+}
+
+.traditional-stat span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.traditional-stat strong {
+  color: var(--ink);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 27px;
+  margin: 7px 0 4px;
+}
+
+.traditional-stat small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.traditional-breakdown-grid {
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.traditional-breakdown {
+  padding: 20px 22px;
+}
+
+.traditional-breakdown + .traditional-breakdown {
+  border-left: 1px solid var(--line);
+}
+
+.traditional-breakdown > strong {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.traditional-breakdown span {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 0;
+}
+
+.traditional-breakdown small {
+  color: var(--muted);
+}
+
+.traditional-definition-note {
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 14px 22px 18px;
+}
+
 .trend-chart-card {
   margin-bottom: 24px;
   padding: 24px;
@@ -1705,6 +1798,25 @@ button:disabled {
     padding: 20px 16px;
   }
 
+  .traditional-stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .traditional-stat,
+  .traditional-stat:nth-child(-n + 5),
+  .traditional-stat:nth-child(5n) {
+    border-right: 1px solid var(--line);
+    border-top: 1px solid var(--line);
+  }
+
+  .traditional-stat:nth-child(-n + 2) {
+    border-top: 0;
+  }
+
+  .traditional-stat:nth-child(2n) {
+    border-right: 0;
+  }
+
   .setup-explainer {
     display: grid;
   }
@@ -1832,6 +1944,15 @@ button:disabled {
   .trend-filter-grid,
   .trend-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .traditional-breakdown-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .traditional-breakdown + .traditional-breakdown {
+    border-left: 0;
+    border-top: 1px solid var(--line);
   }
 
   .trend-window-control {

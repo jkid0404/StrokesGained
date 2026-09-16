@@ -41,6 +41,8 @@ import { useCloudSync } from './useCloudSync'
 import { usePwaUpdate } from './usePwaUpdate'
 import { Trends } from './Trends'
 import { updateShotInHole } from './shotEditing'
+import { calculateTraditionalStats } from './traditionalStats'
+import { TraditionalStatsPanel } from './TraditionalStatsPanel'
 
 type View =
   | 'home'
@@ -2115,6 +2117,7 @@ function Results({
   onEdit: () => void
 }) {
   const metrics = calculateRound(round)
+  const traditionalStats = calculateTraditionalStats([round])
   const baseline = buildPersonalBaseline(allRounds, round)
   const personalDifference =
     metrics.strokesGainedPer18 !== null && baseline.averageSgPer18 !== null
@@ -2153,6 +2156,11 @@ function Results({
           }
         />
       </div>
+
+      <TraditionalStatsPanel
+        context="Round summary"
+        stats={traditionalStats}
+      />
 
       <div className="card">
         <div className="section-heading compact-heading">

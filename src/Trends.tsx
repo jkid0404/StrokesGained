@@ -14,6 +14,8 @@ import {
   type Round,
   type ShotCategory,
 } from './domain'
+import { calculateTraditionalStats } from './traditionalStats'
+import { TraditionalStatsPanel } from './TraditionalStatsPanel'
 
 const CATEGORY_LABELS: Record<ShotCategory, string> = {
   'off-the-tee': 'Off the tee',
@@ -69,6 +71,7 @@ export function Trends({ rounds }: { rounds: Round[] }) {
   const personalReference = personalTrendReference(filteredRounds, category)
   const splits = buildCourseSplits(displayedRounds, category)
   const clubMetrics = buildClubAnalytics(displayedRounds, category)
+  const traditionalStats = calculateTraditionalStats(displayedRounds)
   const values = points.flatMap((point) => (point.value === null ? [] : [point.value]))
   const average = values.length
     ? values.reduce((sum, value) => sum + value, 0) / values.length
@@ -206,6 +209,13 @@ export function Trends({ rounds }: { rounds: Round[] }) {
             metricDetail={metricDetail}
             personalReference={personalReference}
             points={points}
+          />
+
+          <TraditionalStatsPanel
+            context={`Last ${displayedRounds.length} matching round${
+              displayedRounds.length === 1 ? '' : 's'
+            }`}
+            stats={traditionalStats}
           />
 
           <div className="card course-splits-card">

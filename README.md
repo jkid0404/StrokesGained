@@ -11,8 +11,11 @@ comparison splits. Shots can optionally record a club and short note, and the
 filtered Trends view summarizes club usage, starting distance, average SG per
 shot, and total SG. The Manage My Bag page lets users add, rename, and delete
 the club presets used by shot entry without rewriting historical shot records.
-Completed rounds pass through a final scorecard review, and individual shots
-can be edited without discarding the later shot history.
+Round results and filtered Trends also include traditional statistics such as
+fairways, greens in regulation, putting, scrambling, up-and-downs, estimated
+greenside sand saves, approach proximity, penalties, scoring distribution, and
+scoring averages by par. Completed rounds pass through a final scorecard review,
+and individual shots can be edited without discarding the later shot history.
 
 When hosted on Azure Static Web Apps, the app adds private cross-device sync:
 
