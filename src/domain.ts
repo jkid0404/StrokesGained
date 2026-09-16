@@ -280,7 +280,7 @@ export function defaultClub(
 
 export function defaultDistanceEntry(start: Position, finishLie: Lie): number {
   if (start.lie === 'green') return 10
-  return finishLie === 'green' ? 8 : 100
+  return finishLie === 'green' ? 10 : 100
 }
 
 export function calculateShot(shot: Shot, shotIndex: number, par: number): ShotResult {
