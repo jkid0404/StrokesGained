@@ -35,6 +35,7 @@ export interface CourseSplit {
 export interface ClubMetric {
   key: string
   club: string
+  distanceBand: string | null
   shots: number
   averageDistance: number | null
   distanceUnit: 'yards' | 'feet' | null
@@ -125,11 +126,13 @@ export function buildCourseSplits(
 export function buildClubAnalytics(
   rounds: Round[],
   category: TrendCategory,
+  clubOrder: readonly string[] = [],
 ): ClubMetric[] {
   const groups = new Map<
     string,
     {
       club: string
+      distanceBand: string | null
       strokesGained: number[]
       distances: number[]
       units: Set<'yards' | 'feet'>
@@ -146,9 +149,16 @@ export function buildClubAnalytics(
         if (result.strokesGained === null) return
         if (category !== 'total' && result.category !== category) return
 
-        const key = club.toLocaleLowerCase()
+        const normalizedClub = club.toLocaleLowerCase()
+        const bucket = clubDistanceBucket(
+          normalizedClub,
+          shot.start.distance,
+          shot.start.unit,
+        )
+        const key = `${normalizedClub}::${bucket.key}`
         const group = groups.get(key) ?? {
           club,
+          distanceBand: bucket.label,
           strokesGained: [],
           distances: [],
           units: new Set<'yards' | 'feet'>(),
@@ -171,6 +181,7 @@ export function buildClubAnalytics(
       return {
         key,
         club: group.club,
+        distanceBand: group.distanceBand,
         shots: group.strokesGained.length,
         averageDistance: hasOneUnit ? mean(group.distances) : null,
         distanceUnit: hasOneUnit ? [...group.units][0] : null,
@@ -180,10 +191,62 @@ export function buildClubAnalytics(
     })
     .sort(
       (a, b) =>
-        b.shots - a.shots ||
-        b.averageStrokesGained - a.averageStrokesGained ||
-        a.club.localeCompare(b.club),
+        clubOrderIndex(a.club, clubOrder) - clubOrderIndex(b.club, clubOrder) ||
+        a.club.localeCompare(b.club) ||
+        clubBucketOrder(a.key) - clubBucketOrder(b.key),
     )
+}
+
+function clubDistanceBucket(
+  normalizedClub: string,
+  distance: number,
+  unit: 'yards' | 'feet',
+): { key: string; label: string | null } {
+  const displayedDistance = Math.round(distance)
+
+  if (normalizedClub === 'putter') {
+    if (unit !== 'feet') return { key: 'off-green', label: 'Off green' }
+    if (displayedDistance <= 2) return { key: '0-2', label: '0–2 ft' }
+    if (displayedDistance <= 6) return { key: '3-6', label: '3–6 ft' }
+    if (displayedDistance <= 15) return { key: '7-15', label: '7–15 ft' }
+    if (displayedDistance <= 30) return { key: '16-30', label: '16–30 ft' }
+    return { key: '30-plus', label: '30+ ft' }
+  }
+
+  if (normalizedClub === '58 wedge') {
+    if (unit !== 'yards') return { key: 'other-unit', label: 'Other' }
+    if (displayedDistance <= 30) return { key: '0-30', label: '≤30 yd' }
+    if (displayedDistance <= 65) return { key: '31-65', label: '31–65 yd' }
+    return { key: '66-plus', label: '66+ yd' }
+  }
+
+  return { key: 'all', label: null }
+}
+
+function clubOrderIndex(club: string, clubOrder: readonly string[]): number {
+  if (club.toLocaleLowerCase() === 'putter') return Number.MAX_SAFE_INTEGER
+  const index = clubOrder.findIndex(
+    (option) => option.toLocaleLowerCase() === club.toLocaleLowerCase(),
+  )
+  return index >= 0 ? index : clubOrder.length
+}
+
+function clubBucketOrder(key: string): number {
+  const band = key.slice(key.lastIndexOf('::') + 2)
+  const orders: Record<string, number> = {
+    '0-2': 0,
+    '0-30': 0,
+    '3-6': 1,
+    '31-65': 1,
+    '7-15': 2,
+    '66-plus': 2,
+    '16-30': 3,
+    'other-unit': 3,
+    '30-plus': 4,
+    'off-green': 5,
+    all: 0,
+  }
+  return orders[band] ?? 0
 }
 
 function normalizedTeeName(round: Round): string {

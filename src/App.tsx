@@ -335,7 +335,7 @@ function App() {
             onCancel={() => setView('home')}
           />
         )}
-        {view === 'trends' && <Trends rounds={rounds} />}
+        {view === 'trends' && <Trends clubs={clubs} rounds={rounds} />}
         {view === 'entry' && activeRound && (
           <RoundEntry
             key={activeRound.id}

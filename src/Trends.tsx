@@ -26,7 +26,13 @@ const CATEGORY_LABELS: Record<ShotCategory, string> = {
 
 const WINDOW_OPTIONS = [5, 10, 20] as const
 
-export function Trends({ rounds }: { rounds: Round[] }) {
+export function Trends({
+  clubs,
+  rounds,
+}: {
+  clubs: string[]
+  rounds: Round[]
+}) {
   const [windowSize, setWindowSize] = useState<(typeof WINDOW_OPTIONS)[number]>(10)
   const [courseName, setCourseName] = useState('')
   const [teeName, setTeeName] = useState('')
@@ -70,7 +76,7 @@ export function Trends({ rounds }: { rounds: Round[] }) {
   const points = buildTrendPoints(displayedRounds, category)
   const personalReference = personalTrendReference(filteredRounds, category)
   const splits = buildCourseSplits(displayedRounds, category)
-  const clubMetrics = buildClubAnalytics(displayedRounds, category)
+  const clubMetrics = buildClubAnalytics(displayedRounds, category, clubs)
   const traditionalStats = calculateTraditionalStats(displayedRounds)
   const values = points.flatMap((point) => (point.value === null ? [] : [point.value]))
   const average = values.length
@@ -283,6 +289,7 @@ export function Trends({ rounds }: { rounds: Round[] }) {
                     <span>
                       <strong>{metric.club}</strong>
                       <small>
+                        {metric.distanceBand && `${metric.distanceBand} · `}
                         {metric.shots < 5 ? 'Small sample' : 'Established sample'}
                       </small>
                     </span>

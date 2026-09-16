@@ -79,16 +79,57 @@ describe('trend analytics', () => {
   it('aggregates supported strokes gained by recorded club and category', () => {
     const round = makeRound('round', 'Alpha', 'Blue', '2026-01-01', 9, 400)
     round.holes.forEach((hole, index) => {
-      hole.shots[0].club = index < 6 ? 'Driver' : '3 wood'
+      hole.shots[0].club = index < 3 ? 'Driver' : '3 wood'
     })
 
-    const metrics = buildClubAnalytics([round], 'off-the-tee')
+    const metrics = buildClubAnalytics(
+      [round],
+      'off-the-tee',
+      ['Driver', '3 wood', 'Putter'],
+    )
     expect(metrics.map((metric) => [metric.club, metric.shots])).toEqual([
-      ['Driver', 6],
-      ['3 wood', 3],
+      ['Driver', 3],
+      ['3 wood', 6],
     ])
     expect(metrics[0].averageDistance).toBe(400)
     expect(metrics[0].distanceUnit).toBe('yards')
+  })
+
+  it('splits putter and 58 wedge metrics into ordered distance bands', () => {
+    const round = makeBucketRound()
+    const metrics = buildClubAnalytics(
+      [round],
+      'total',
+      ['Driver', '3 wood', '58 wedge', 'Putter'],
+    )
+
+    expect(
+      metrics.map((metric) => [metric.club, metric.distanceBand, metric.shots]),
+    ).toEqual([
+      ['58 wedge', '≤30 yd', 1],
+      ['58 wedge', '31–65 yd', 1],
+      ['58 wedge', '66+ yd', 1],
+      ['Putter', '0–2 ft', 1],
+      ['Putter', '3–6 ft', 1],
+      ['Putter', '7–15 ft', 1],
+      ['Putter', '16–30 ft', 1],
+      ['Putter', '30+ ft', 1],
+    ])
+  })
+
+  it('uses displayed whole-number distances at bucket boundaries', () => {
+    const round = makeBucketRound()
+    round.holes[0].shots[0].start.distance = 2.4
+    round.holes[5].shots[0].start.distance = 30.4
+
+    const metrics = buildClubAnalytics(
+      [round],
+      'total',
+      ['58 wedge', 'Putter'],
+    )
+
+    expect(metrics.find((metric) => metric.key === 'putter::0-2')?.shots).toBe(1)
+    expect(metrics.find((metric) => metric.key === '58 wedge::0-30')?.shots).toBe(1)
   })
 })
 
@@ -118,6 +159,47 @@ function makeRound(
           start: { lie: 'tee' as const, distance: yardage, unit: 'yards' as const },
           finish: { lie: 'holed' as const, distance: 0, unit: 'feet' as const },
           penaltyStrokes: 0,
+        },
+      ],
+    })),
+  }
+}
+
+function makeBucketRound(): Round {
+  const shots = [
+    ['Putter', 'green', 2],
+    ['Putter', 'green', 4],
+    ['Putter', 'green', 10],
+    ['Putter', 'green', 20],
+    ['Putter', 'green', 40],
+    ['58 wedge', 'rough', 20],
+    ['58 wedge', 'rough', 50],
+    ['58 wedge', 'rough', 80],
+  ] as const
+
+  return {
+    id: 'buckets',
+    courseName: 'Alpha',
+    teeName: 'Blue',
+    playedOn: '2026-04-01',
+    createdAt: '2026-04-01T12:00:00Z',
+    status: 'complete',
+    benchmarkVersion: BENCHMARK_VERSION,
+    holes: shots.map(([club, lie, distance], index) => ({
+      number: index + 1,
+      par: 4,
+      yardage: 400,
+      shots: [
+        {
+          id: `bucket-${index}`,
+          start: {
+            lie,
+            distance,
+            unit: lie === 'green' ? ('feet' as const) : ('yards' as const),
+          },
+          finish: { lie: 'holed' as const, distance: 0, unit: 'feet' as const },
+          penaltyStrokes: 0,
+          club,
         },
       ],
     })),
