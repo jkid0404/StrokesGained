@@ -90,6 +90,11 @@ describe('trend analytics', () => {
     expect(metrics.map((metric) => [metric.club, metric.shots])).toEqual([
       ['Driver', 3],
       ['3 wood', 6],
+      ['Putter', 0],
+      ['Putter', 0],
+      ['Putter', 0],
+      ['Putter', 0],
+      ['Putter', 0],
     ])
     expect(metrics[0].averageDistance).toBe(400)
     expect(metrics[0].distanceUnit).toBe('yards')
@@ -100,7 +105,7 @@ describe('trend analytics', () => {
     const metrics = buildClubAnalytics(
       [round],
       'total',
-      ['Driver', '3 wood', '58 wedge', 'Putter'],
+      ['58 wedge', 'Putter'],
     )
 
     expect(
@@ -114,6 +119,31 @@ describe('trend analytics', () => {
       ['Putter', '7–15 ft', 1],
       ['Putter', '16–30 ft', 1],
       ['Putter', '31+ ft', 1],
+    ])
+  })
+
+  it('includes every bag club and distance band when no shots are recorded', () => {
+    const metrics = buildClubAnalytics(
+      [],
+      'total',
+      ['Driver', '58 wedge', 'Putter'],
+    )
+
+    expect(metrics).toHaveLength(9)
+    expect(metrics.every((metric) => metric.shots === 0)).toBe(true)
+    expect(metrics.every((metric) => metric.averageStrokesGained === null)).toBe(
+      true,
+    )
+    expect(metrics.map((metric) => metric.club)).toEqual([
+      'Driver',
+      '58 wedge',
+      '58 wedge',
+      '58 wedge',
+      'Putter',
+      'Putter',
+      'Putter',
+      'Putter',
+      'Putter',
     ])
   })
 

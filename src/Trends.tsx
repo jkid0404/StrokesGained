@@ -290,27 +290,39 @@ export function Trends({
                       <strong>{metric.club}</strong>
                       <small>
                         {metric.distanceBand && `${metric.distanceBand} · `}
-                        {metric.shots < 5 ? 'Small sample' : 'Established sample'}
+                        {metric.shots === 0
+                          ? 'No shots'
+                          : metric.shots < 5
+                            ? 'Small sample'
+                            : 'Established sample'}
                       </small>
                     </span>
                     <span>{metric.shots}</span>
                     <span>
                       {metric.averageDistance === null || metric.distanceUnit === null
-                        ? 'Mixed'
+                        ? 'N/A'
                         : `${metric.averageDistance.toFixed(0)} ${
                             metric.distanceUnit === 'feet' ? 'ft' : 'yd'
                           }`}
                     </span>
                     <strong
                       className={
-                        metric.averageStrokesGained >= 0 ? 'positive' : 'negative'
+                        metric.averageStrokesGained === null
+                          ? 'neutral-metric'
+                          : metric.averageStrokesGained >= 0
+                            ? 'positive'
+                            : 'negative'
                       }
                     >
                       {formatMetric(metric.averageStrokesGained)}
                     </strong>
                     <strong
                       className={
-                        metric.totalStrokesGained >= 0 ? 'positive' : 'negative'
+                        metric.totalStrokesGained === null
+                          ? 'neutral-metric'
+                          : metric.totalStrokesGained >= 0
+                            ? 'positive'
+                            : 'negative'
                       }
                     >
                       {formatMetric(metric.totalStrokesGained)}
