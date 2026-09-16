@@ -12,6 +12,7 @@ import {
   calculateShot,
   courseKey,
   createId,
+  defaultFinishLie,
   excludeDeletedCourseTemplates,
   formatMetric,
   mergeCourseTemplates,
@@ -680,8 +681,18 @@ function RoundEntry({
   const isHoleComplete = hole.shots.at(-1)?.finish.lie === 'holed'
   const start: Position =
     hole.shots.at(-1)?.finish ?? { lie: 'tee', distance: hole.yardage, unit: 'yards' }
-  const [finishLie, setFinishLie] = useState<Lie>(start.lie === 'green' ? 'holed' : 'fairway')
-  const [distance, setDistance] = useState(start.lie === 'green' ? '8' : '100')
+  const startLie = start.lie
+  const startDistance = start.distance
+  const startUnit = start.unit
+  const mostRecentFinishLie = useRef<Lie>('fairway')
+  const initialFinishLie = defaultFinishLie(
+    hole.par,
+    hole.shots.length,
+    start,
+    'fairway',
+  )
+  const [finishLie, setFinishLie] = useState<Lie>(initialFinishLie)
+  const [distance, setDistance] = useState(initialFinishLie === 'green' ? '8' : '100')
   const [penaltyStrokes, setPenaltyStrokes] = useState(0)
   const [formError, setFormError] = useState('')
   const [editingHoleDetails, setEditingHoleDetails] = useState(false)
@@ -693,6 +704,19 @@ function RoundEntry({
     calculateShot(shot, index, hole.par),
   )
   const holeStrokesGained = calculateHoleStrokesGained(hole)
+
+  useEffect(() => {
+    const nextFinishLie = defaultFinishLie(
+      hole.par,
+      hole.shots.length,
+      { lie: startLie, distance: startDistance, unit: startUnit },
+      mostRecentFinishLie.current,
+    )
+    setFinishLie(nextFinishLie)
+    setDistance(nextFinishLie === 'green' ? '8' : '100')
+    setPenaltyStrokes(0)
+    setFormError('')
+  }, [activeHoleIndex, hole.par, hole.shots.length, startDistance, startLie, startUnit])
 
   useEffect(() => {
     if (hole.shots.length === 0 || needsHoleSetup) return
@@ -976,7 +1000,10 @@ function RoundEntry({
                     className={finishLie === lie ? 'active' : ''}
                     type="button"
                     key={lie}
-                    onClick={() => setFinishLie(lie)}
+                    onClick={() => {
+                      mostRecentFinishLie.current = lie
+                      setFinishLie(lie)
+                    }}
                   >
                     {LIE_LABELS[lie]}
                   </button>

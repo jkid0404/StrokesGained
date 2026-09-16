@@ -231,6 +231,18 @@ export function shotCategory(shot: Shot, shotIndex: number, par: number): ShotCa
   return 'approach'
 }
 
+export function defaultFinishLie(
+  par: number,
+  shotIndex: number,
+  start: Position,
+  mostRecentlySelectedLie: Lie,
+): Lie {
+  if (start.lie === 'green') return start.distance <= 8 ? 'holed' : 'green'
+  if (start.lie === 'tee') return par === 3 ? 'green' : 'fairway'
+  if ((par === 4 || par === 5) && shotIndex === 1) return 'green'
+  return mostRecentlySelectedLie
+}
+
 export function calculateShot(shot: Shot, shotIndex: number, par: number): ShotResult {
   const category = shotCategory(shot, shotIndex, par)
   try {

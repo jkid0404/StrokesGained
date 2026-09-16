@@ -7,6 +7,7 @@ import {
   calculateRound,
   calculateShot,
   calculateCumulativeMetrics,
+  defaultFinishLie,
   expectedStrokes,
   excludeDeletedCourseTemplates,
   mergeCourseTemplates,
@@ -83,6 +84,31 @@ describe('strokes gained calculations', () => {
   it('supports tee shots through 600 yards', () => {
     const round = makeRound('supported', '2026-01-01', 600)
     expect(calculateRound(round).totalStrokesGained).not.toBeNull()
+  })
+})
+
+describe('default finishing lie', () => {
+  it('uses hole and shot context for tee and second shots', () => {
+    const tee = { lie: 'tee', distance: 180, unit: 'yards' } as const
+    const fairway = { lie: 'fairway', distance: 150, unit: 'yards' } as const
+
+    expect(defaultFinishLie(3, 0, tee, 'rough')).toBe('green')
+    expect(defaultFinishLie(4, 0, tee, 'green')).toBe('fairway')
+    expect(defaultFinishLie(5, 0, tee, 'sand')).toBe('fairway')
+    expect(defaultFinishLie(4, 1, fairway, 'rough')).toBe('green')
+    expect(defaultFinishLie(5, 1, fairway, 'sand')).toBe('green')
+  })
+
+  it('uses distance from the green and otherwise remembers the manual selection', () => {
+    expect(
+      defaultFinishLie(4, 2, { lie: 'green', distance: 8, unit: 'feet' }, 'rough'),
+    ).toBe('holed')
+    expect(
+      defaultFinishLie(4, 2, { lie: 'green', distance: 8.1, unit: 'feet' }, 'rough'),
+    ).toBe('green')
+    expect(
+      defaultFinishLie(5, 2, { lie: 'rough', distance: 80, unit: 'yards' }, 'sand'),
+    ).toBe('sand')
   })
 })
 
