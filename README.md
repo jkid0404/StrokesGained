@@ -41,6 +41,12 @@ The Vite server remains fully usable in local-only mode. If `/.auth/me` is not
 available, sign-in is not required and the existing localStorage keys continue
 to be used.
 
+Production builds include an installable Progressive Web App manifest and a
+versioned service worker. After one successful online load, the application
+shell can be reopened offline while rounds continue to save locally. Azure API
+and authentication responses are never cached. When a new deployment is ready,
+the app prompts before reloading into the new version.
+
 ```powershell
 npm install
 npm run dev

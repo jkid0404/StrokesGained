@@ -6,6 +6,12 @@
     {
       "route": "/.auth/*",
       "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
+      "route": "/sw.js",
+      "headers": {
+        "Cache-Control": "no-cache"
+      }
     }
   ],
   "navigationFallback": {
@@ -14,7 +20,7 @@
       "/.auth/*",
       "/api/*",
       "/assets/*",
-      "/*.{css,ico,jpg,jpeg,js,json,png,svg,webp,woff,woff2}"
+      "/*.{css,ico,jpg,jpeg,js,json,png,svg,webmanifest,webp,woff,woff2}"
     ]
   },
   "globalHeaders": {

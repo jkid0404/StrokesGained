@@ -37,6 +37,7 @@ import {
 } from './storage'
 import type { LocalState } from './cloudState'
 import { useCloudSync } from './useCloudSync'
+import { usePwaUpdate } from './usePwaUpdate'
 import { Trends } from './Trends'
 import { updateShotInHole } from './shotEditing'
 
@@ -99,6 +100,7 @@ function App() {
     localState: { rounds, courses, deletedCourseKeys },
     applyState: applyCloudState,
   })
+  const pwa = usePwaUpdate()
   const roundSyncPending =
     view === 'entry' &&
     ['saving', 'offline', 'error'].includes(cloud.syncStatus)
@@ -256,6 +258,22 @@ function App() {
       </header>
 
       <main>
+        {pwa.updateAvailable && (
+          <div className="app-update-banner" role="status">
+            <div>
+              <strong>App update available</strong>
+              <span>Reload when you are ready to use the latest version.</span>
+            </div>
+            <div className="app-update-actions">
+              <button className="text-button" type="button" onClick={pwa.dismissUpdate}>
+                Later
+              </button>
+              <button className="primary compact" type="button" onClick={pwa.applyUpdate}>
+                Update now
+              </button>
+            </div>
+          </div>
+        )}
         {cloud.syncStatus === 'conflict' && (
           <div className="sync-conflict" role="alert">
             <div>
