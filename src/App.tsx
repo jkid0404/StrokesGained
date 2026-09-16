@@ -14,6 +14,7 @@ import {
   courseKey,
   createId,
   defaultClub,
+  defaultDistanceEntry,
   defaultFinishLie,
   excludeDeletedCourseTemplates,
   formatMetric,
@@ -96,6 +97,9 @@ function App() {
     localState: { rounds, courses, deletedCourseKeys },
     applyState: applyCloudState,
   })
+  const roundSyncPending =
+    view === 'entry' &&
+    ['saving', 'offline', 'error'].includes(cloud.syncStatus)
 
   const activeRound = rounds.find((round) => round.id === activeRoundId) ?? null
   const roundsSelected = view === 'home' || view === 'entry' || view === 'results'
@@ -260,14 +264,12 @@ function App() {
             </button>
           </div>
         )}
-        {view === 'entry' &&
-          ['saving', 'offline', 'error'].includes(cloud.syncStatus) && (
-            <div className={`round-sync-banner ${cloud.syncStatus}`} role="status">
-              {cloud.syncStatus === 'offline'
-                ? cloud.syncMessage
-                : 'Sync pending'}
-            </div>
-          )}
+        {roundSyncPending && (
+          <DelayedRoundSyncBanner
+            message={cloud.syncMessage}
+            status={cloud.syncStatus}
+          />
+        )}
         {view === 'home' && (
           <Home
             rounds={rounds}
@@ -423,6 +425,29 @@ function CloudStatus({
       >
         Sign out
       </a>
+    </div>
+  )
+}
+
+function DelayedRoundSyncBanner({
+  message,
+  status,
+}: {
+  message: string
+  status: string
+}) {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(true), 10_000)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  if (!visible) return null
+
+  return (
+    <div className={`round-sync-banner ${status}`} role="status">
+      {status === 'offline' ? message : 'Sync pending'}
     </div>
   )
 }
@@ -727,7 +752,9 @@ function RoundEntry({
     'fairway',
   )
   const [finishLie, setFinishLie] = useState<Lie>(initialFinishLie)
-  const [distance, setDistance] = useState(initialFinishLie === 'green' ? '8' : '100')
+  const [distance, setDistance] = useState(
+    String(defaultDistanceEntry(start, initialFinishLie)),
+  )
   const [penaltyStrokes, setPenaltyStrokes] = useState(0)
   const [club, setClub] = useState(() => defaultClub(start, 'Driver', ''))
   const [note, setNote] = useState('')
@@ -751,7 +778,14 @@ function RoundEntry({
       mostRecentFinishLie.current,
     )
     setFinishLie(nextFinishLie)
-    setDistance(nextFinishLie === 'green' ? '8' : '100')
+    setDistance(
+      String(
+        defaultDistanceEntry(
+          { lie: startLie, distance: startDistance, unit: startUnit },
+          nextFinishLie,
+        ),
+      ),
+    )
     setPenaltyStrokes(0)
     setClub(
       defaultClub(
@@ -888,6 +922,8 @@ function RoundEntry({
   }
 
   const allComplete = metrics.completedHoles === round.holes.length
+  const clubIsCustom =
+    club !== '' && club !== 'Other' && !CLUB_OPTIONS.some((option) => option === club)
 
   return (
     <section className="entry-page">
@@ -1137,7 +1173,7 @@ function RoundEntry({
                 </select>
               </label>
 
-              <details className="shot-optional-details">
+              <details className="shot-optional-details" open>
                 <summary>
                   {club ? `Club: ${club}` : 'Add club'}
                   {note ? ' · Note added' : ' · Add note'}
@@ -1145,10 +1181,7 @@ function RoundEntry({
                 <div className="shot-optional-fields">
                   <label>
                     Club
-                    <input
-                      list="club-options"
-                      maxLength={40}
-                      placeholder="No club recorded"
+                    <select
                       value={club}
                       onChange={(event) => {
                         const nextClub = event.target.value
@@ -1159,12 +1192,16 @@ function RoundEntry({
                           mostRecentOtherClub.current = nextClub
                         }
                       }}
-                    />
-                    <datalist id="club-options">
+                    >
+                      <option value="">No club recorded</option>
+                      {clubIsCustom && <option value={club}>{club}</option>}
                       {CLUB_OPTIONS.map((option) => (
-                        <option value={option} key={option} />
+                        <option value={option} key={option}>
+                          {option}
+                        </option>
                       ))}
-                    </datalist>
+                      <option value="Other">Other</option>
+                    </select>
                   </label>
                   <label>
                     Shot note

@@ -10,6 +10,7 @@ import {
   calculateCumulativeMetrics,
   defaultFinishLie,
   defaultClub,
+  defaultDistanceEntry,
   expectedStrokes,
   excludeDeletedCourseTemplates,
   mergeCourseTemplates,
@@ -126,6 +127,23 @@ describe('default club', () => {
     expect(
       defaultClub({ lie: 'rough', distance: 150, unit: 'yards' }, 'Driver', '7 iron'),
     ).toBe('7 iron')
+  })
+})
+
+describe('default distance entry', () => {
+  it('uses 10 feet from the green and 8 feet for approaches finishing on it', () => {
+    expect(
+      defaultDistanceEntry({ lie: 'green', distance: 20, unit: 'feet' }, 'green'),
+    ).toBe(10)
+    expect(
+      defaultDistanceEntry({ lie: 'green', distance: 6, unit: 'feet' }, 'holed'),
+    ).toBe(10)
+    expect(
+      defaultDistanceEntry({ lie: 'fairway', distance: 150, unit: 'yards' }, 'green'),
+    ).toBe(8)
+    expect(
+      defaultDistanceEntry({ lie: 'rough', distance: 150, unit: 'yards' }, 'fairway'),
+    ).toBe(100)
   })
 })
 

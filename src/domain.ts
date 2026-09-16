@@ -278,6 +278,11 @@ export function defaultClub(
   return mostRecentOtherClub
 }
 
+export function defaultDistanceEntry(start: Position, finishLie: Lie): number {
+  if (start.lie === 'green') return 10
+  return finishLie === 'green' ? 8 : 100
+}
+
 export function calculateShot(shot: Shot, shotIndex: number, par: number): ShotResult {
   const category = shotCategory(shot, shotIndex, par)
   try {
