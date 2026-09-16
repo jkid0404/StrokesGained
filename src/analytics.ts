@@ -223,8 +223,7 @@ function clubDistanceBucketsFor(
 ): Array<{ key: string; label: string | null }> {
   if (normalizedClub === 'putter') {
     return [
-      { key: '0-2', label: '0–2 ft' },
-      { key: '3-6', label: '3–6 ft' },
+      { key: '0-6', label: '0–6 ft' },
       { key: '7-15', label: '7–15 ft' },
       { key: '16-30', label: '16–30 ft' },
       { key: '31-plus', label: '31+ ft' },
@@ -248,8 +247,7 @@ function clubDistanceBucket(
   const displayedDistance = Math.round(distance)
 
   if (normalizedClub === 'putter') {
-    if (displayedDistance <= 2) return { key: '0-2', label: '0–2 ft' }
-    if (displayedDistance <= 6) return { key: '3-6', label: '3–6 ft' }
+    if (displayedDistance <= 6) return { key: '0-6', label: '0–6 ft' }
     if (displayedDistance <= 15) return { key: '7-15', label: '7–15 ft' }
     if (displayedDistance <= 30) return { key: '16-30', label: '16–30 ft' }
     return { key: '31-plus', label: '31+ ft' }
@@ -290,15 +288,14 @@ function clubOrderIndex(club: string, clubOrder: readonly string[]): number {
 function clubBucketOrder(key: string): number {
   const band = key.slice(key.lastIndexOf('::') + 2)
   const orders: Record<string, number> = {
-    '0-2': 0,
+    '0-6': 0,
     '0-30': 0,
-    '3-6': 1,
     '31-65': 1,
-    '7-15': 2,
+    '7-15': 1,
     '66-plus': 2,
-    '16-30': 3,
+    '16-30': 2,
     'other-unit': 3,
-    '31-plus': 4,
+    '31-plus': 3,
     all: 0,
   }
   return orders[band] ?? 0

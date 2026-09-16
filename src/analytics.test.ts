@@ -94,7 +94,6 @@ describe('trend analytics', () => {
       ['Putter', 0],
       ['Putter', 0],
       ['Putter', 0],
-      ['Putter', 0],
     ])
     expect(metrics[0].averageDistance).toBe(400)
     expect(metrics[0].distanceUnit).toBe('yards')
@@ -114,8 +113,7 @@ describe('trend analytics', () => {
       ['58 wedge', '≤30 yd', 1],
       ['58 wedge', '31–65 yd', 1],
       ['58 wedge', '66+ yd', 1],
-      ['Putter', '0–2 ft', 1],
-      ['Putter', '3–6 ft', 1],
+      ['Putter', '0–6 ft', 2],
       ['Putter', '7–15 ft', 1],
       ['Putter', '16–30 ft', 1],
       ['Putter', '31+ ft', 1],
@@ -129,7 +127,7 @@ describe('trend analytics', () => {
       ['Driver', '58 wedge', 'Putter'],
     )
 
-    expect(metrics).toHaveLength(9)
+    expect(metrics).toHaveLength(8)
     expect(metrics.every((metric) => metric.shots === 0)).toBe(true)
     expect(metrics.every((metric) => metric.averageStrokesGained === null)).toBe(
       true,
@@ -139,7 +137,6 @@ describe('trend analytics', () => {
       '58 wedge',
       '58 wedge',
       '58 wedge',
-      'Putter',
       'Putter',
       'Putter',
       'Putter',
@@ -158,7 +155,7 @@ describe('trend analytics', () => {
       ['58 wedge', 'Putter'],
     )
 
-    expect(metrics.find((metric) => metric.key === 'putter::0-2')?.shots).toBe(1)
+    expect(metrics.find((metric) => metric.key === 'putter::0-6')?.shots).toBe(2)
     expect(metrics.find((metric) => metric.key === '58 wedge::0-30')?.shots).toBe(1)
   })
 

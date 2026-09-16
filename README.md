@@ -10,9 +10,10 @@ supports course, tee, date, round-length, and category filters with course/tee
 comparison splits. Shots can optionally record a club and short note, and the
 filtered Trends view summarizes club usage, starting distance, average SG per
 shot, and total SG. Club analytics follow bag order rather than sample size,
-with separate distance bands for Putter and 58 wedge shots. The Manage My Bag
-page lets users add, rename, and delete the club presets used by shot entry
-without rewriting historical shot records.
+with separate distance bands for Putter (`0–6`, `7–15`, `16–30`, and `31+`
+feet) and 58 wedge shots. The Manage My Bag page lets users add, rename, and
+delete the club presets used by shot entry without rewriting historical shot
+records.
 Round results and filtered Trends also include traditional statistics such as
 fairways, greens in regulation, putting, scrambling, up-and-downs, estimated
 greenside sand saves, approach proximity, penalties, scoring distribution, and
