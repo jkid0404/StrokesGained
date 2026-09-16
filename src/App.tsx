@@ -42,7 +42,7 @@ const CATEGORY_LABELS: Record<ShotCategory, string> = {
   putting: 'Putting',
 }
 
-const PLAYABLE_LIES: Lie[] = ['fairway', 'rough', 'sand', 'recovery', 'green', 'holed']
+const PLAYABLE_LIES: Lie[] = ['fairway', 'rough', 'sand', 'green', 'holed']
 
 function App() {
   const [rounds, setRounds] = useState<Round[]>(loadRounds)
