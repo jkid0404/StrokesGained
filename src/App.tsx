@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import {
   BENCHMARK_VERSION,
@@ -38,11 +38,13 @@ import {
 import type { LocalState } from './cloudState'
 import { useCloudSync } from './useCloudSync'
 import { Trends } from './Trends'
+import { updateShotInHole } from './shotEditing'
 
 type View =
   | 'home'
   | 'setup'
   | 'entry'
+  | 'review'
   | 'results'
   | 'trends'
   | 'courses'
@@ -102,7 +104,8 @@ function App() {
     ['saving', 'offline', 'error'].includes(cloud.syncStatus)
 
   const activeRound = rounds.find((round) => round.id === activeRoundId) ?? null
-  const roundsSelected = view === 'home' || view === 'entry' || view === 'results'
+  const roundsSelected =
+    view === 'home' || view === 'entry' || view === 'review' || view === 'results'
   const trendsSelected = view === 'trends'
   const coursesSelected = view === 'courses' || view === 'course-edit'
 
@@ -303,8 +306,19 @@ function App() {
             onHoleChange={setActiveHoleIndex}
             onChange={upsertRound}
             onHoleDetailsChange={updateCourseHole}
-            onFinish={(round) => {
-              upsertRound({ ...round, status: 'complete' })
+            onReview={() => setView('review')}
+          />
+        )}
+        {view === 'review' && activeRound && (
+          <RoundReview
+            round={activeRound}
+            onBack={() => setView('entry')}
+            onEditHole={(index) => {
+              setActiveHoleIndex(index)
+              setView('entry')
+            }}
+            onFinish={() => {
+              upsertRound({ ...activeRound, status: 'complete' })
               setView('results')
             }}
           />
@@ -724,7 +738,7 @@ function RoundEntry({
   onHoleChange,
   onChange,
   onHoleDetailsChange,
-  onFinish,
+  onReview,
 }: {
   round: Round
   activeHoleIndex: number
@@ -732,7 +746,7 @@ function RoundEntry({
   onHoleChange: (index: number) => void
   onChange: (round: Round) => void
   onHoleDetailsChange: (courseName: string, teeName: string, hole: Hole) => void
-  onFinish: (round: Round) => void
+  onReview: () => void
 }) {
   const hole = round.holes[activeHoleIndex]
   const needsHoleSetup = hole.par < 3 || hole.yardage <= 0
@@ -760,6 +774,7 @@ function RoundEntry({
   const [note, setNote] = useState('')
   const [formError, setFormError] = useState('')
   const [editingHoleDetails, setEditingHoleDetails] = useState(false)
+  const [editingShotIndex, setEditingShotIndex] = useState<number | null>(null)
   const shotCardRef = useRef<HTMLDivElement>(null)
   const holeTabsRef = useRef<HTMLDivElement>(null)
   const metrics = calculateRound(round)
@@ -797,6 +812,7 @@ function RoundEntry({
     setNote('')
     setFormError('')
     setEditingHoleDetails(false)
+    setEditingShotIndex(null)
   }, [activeHoleIndex, hole.par, hole.shots.length, startDistance, startLie, startUnit])
 
   useEffect(() => {
@@ -888,6 +904,14 @@ function RoundEntry({
       holeIndex === activeHoleIndex ? { ...item, shots: item.shots.slice(0, index) } : item,
     )
     onChange({ ...round, holes: updatedHoles })
+  }
+
+  function saveEditedShot(index: number, shot: Shot) {
+    const updatedHoles = round.holes.map((item, holeIndex) =>
+      holeIndex === activeHoleIndex ? updateShotInHole(item, index, shot) : item,
+    )
+    onChange({ ...round, holes: updatedHoles })
+    setEditingShotIndex(null)
   }
 
   function goNext() {
@@ -1049,33 +1073,68 @@ function RoundEntry({
               {hole.shots.map((shot, index) => {
                 const result = holeShotResults[index]
                 return (
-                  <div className="shot-row" key={shot.id}>
-                    <span className="shot-number">{index + 1}</span>
-                    <span className="shot-description">
-                      <strong>
-                        {LIE_LABELS[shot.start.lie]} {shot.start.distance}
-                        {shot.start.unit === 'feet' ? ' ft' : ' yd'}
-                      </strong>
-                      <small>
-                        to {LIE_LABELS[shot.finish.lie]}
-                        {shot.finish.lie !== 'holed'
-                          ? ` ${shot.finish.distance}${shot.finish.unit === 'feet' ? ' ft' : ' yd'}`
-                          : ''}
-                        {shot.penaltyStrokes ? ` · +${shot.penaltyStrokes} penalty` : ''}
-                      </small>
-                      {(shot.club || shot.note) && (
-                        <small className="shot-metadata">
-                          {[shot.club, shot.note].filter(Boolean).join(' · ')}
+                  <Fragment key={shot.id}>
+                    <div className="shot-row">
+                      <span className="shot-number">{index + 1}</span>
+                      <span className="shot-description">
+                        <strong>
+                          {LIE_LABELS[shot.start.lie]} {shot.start.distance}
+                          {shot.start.unit === 'feet' ? ' ft' : ' yd'}
+                        </strong>
+                        <small>
+                          to {LIE_LABELS[shot.finish.lie]}
+                          {shot.finish.lie !== 'holed'
+                            ? ` ${shot.finish.distance}${shot.finish.unit === 'feet' ? ' ft' : ' yd'}`
+                            : ''}
+                          {shot.penaltyStrokes ? ` · +${shot.penaltyStrokes} penalty` : ''}
                         </small>
-                      )}
-                    </span>
-                    <strong className={result.strokesGained !== null && result.strokesGained >= 0 ? 'positive' : 'negative'}>
-                      {formatMetric(result.strokesGained)}
-                    </strong>
-                    <button className="icon-button" type="button" onClick={() => truncateShots(index)}>
-                      Undo
-                    </button>
-                  </div>
+                        {(shot.club || shot.note) && (
+                          <small className="shot-metadata">
+                            {[shot.club, shot.note].filter(Boolean).join(' · ')}
+                          </small>
+                        )}
+                      </span>
+                      <strong
+                        className={
+                          result.strokesGained !== null && result.strokesGained >= 0
+                            ? 'positive'
+                            : 'negative'
+                        }
+                      >
+                        {formatMetric(result.strokesGained)}
+                      </strong>
+                      <span className="shot-row-actions">
+                        <button
+                          className="icon-button"
+                          type="button"
+                          onClick={() =>
+                            setEditingShotIndex(
+                              editingShotIndex === index ? null : index,
+                            )
+                          }
+                        >
+                          {editingShotIndex === index ? 'Cancel' : 'Edit'}
+                        </button>
+                        <button
+                          className="icon-button"
+                          type="button"
+                          onClick={() => truncateShots(index)}
+                        >
+                          Undo
+                        </button>
+                      </span>
+                    </div>
+                    {editingShotIndex === index && (
+                      <ShotEditor
+                        isLast={index === hole.shots.length - 1}
+                        onCancel={() => setEditingShotIndex(null)}
+                        onSave={(updatedShot) => saveEditedShot(index, updatedShot)}
+                        par={hole.par}
+                        shot={shot}
+                        shotIndex={index}
+                      />
+                    )}
+                  </Fragment>
                 )
               })}
               {isHoleComplete && (
@@ -1112,8 +1171,8 @@ function RoundEntry({
                 </button>
               )}
               {allComplete && (
-                <button className="primary" type="button" onClick={() => onFinish(round)}>
-                  Finish round
+                <button className="primary" type="button" onClick={onReview}>
+                  Review round
                 </button>
               )}
               <button className="secondary" type="button" onClick={() => truncateShots(hole.shots.length - 1)}>
@@ -1285,6 +1344,152 @@ function CourseLibrary({
         </div>
       )}
     </section>
+  )
+}
+
+function ShotEditor({
+  shot,
+  shotIndex,
+  par,
+  isLast,
+  onSave,
+  onCancel,
+}: {
+  shot: Shot
+  shotIndex: number
+  par: number
+  isLast: boolean
+  onSave: (shot: Shot) => void
+  onCancel: () => void
+}) {
+  const [finishLie, setFinishLie] = useState<Lie>(shot.finish.lie)
+  const [distance, setDistance] = useState(
+    shot.finish.lie === 'holed' ? '' : String(shot.finish.distance),
+  )
+  const [penaltyStrokes, setPenaltyStrokes] = useState(shot.penaltyStrokes)
+  const [club, setClub] = useState(shot.club ?? '')
+  const [note, setNote] = useState(shot.note ?? '')
+  const [error, setError] = useState('')
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault()
+    if (finishLie === 'holed' && !isLast) {
+      setError('Only the final shot on a hole can finish as holed.')
+      return
+    }
+
+    const parsedDistance = Number(distance)
+    if (finishLie !== 'holed' && (!Number.isFinite(parsedDistance) || parsedDistance <= 0)) {
+      setError('Enter a distance greater than zero.')
+      return
+    }
+
+    const finish: Position =
+      finishLie === 'holed'
+        ? { lie: 'holed', distance: 0, unit: 'feet' }
+        : {
+            lie: finishLie,
+            distance: parsedDistance,
+            unit: finishLie === 'green' ? 'feet' : 'yards',
+          }
+    const updatedShot: Shot = {
+      ...shot,
+      finish,
+      penaltyStrokes,
+      ...(club.trim() ? { club: club.trim() } : { club: undefined }),
+      ...(note.trim() ? { note: note.trim() } : { note: undefined }),
+    }
+    const result = calculateShot(updatedShot, shotIndex, par)
+    if (result.error) {
+      setError(result.error)
+      return
+    }
+    onSave(updatedShot)
+  }
+
+  return (
+    <form className="shot-editor" onSubmit={submit}>
+      <span className="eyebrow">Edit shot {shotIndex + 1}</span>
+      <div className="shot-editor-grid">
+        <label>
+          Finishing lie
+          <select
+            value={finishLie}
+            onChange={(event) => {
+              const lie = event.target.value as Lie
+              setFinishLie(lie)
+              if (lie !== 'holed' && distance === '') {
+                setDistance(String(defaultDistanceEntry(shot.start, lie)))
+              }
+            }}
+          >
+            {PLAYABLE_LIES.filter((lie) => isLast || lie !== 'holed').map((lie) => (
+              <option value={lie} key={lie}>
+                {LIE_LABELS[lie]}
+              </option>
+            ))}
+          </select>
+        </label>
+        {finishLie !== 'holed' && (
+          <label>
+            Distance ({finishLie === 'green' ? 'feet' : 'yards'})
+            <input
+              inputMode="decimal"
+              min="0.1"
+              required
+              step="0.1"
+              type="number"
+              value={distance}
+              onChange={(event) => setDistance(event.target.value)}
+            />
+          </label>
+        )}
+        <label>
+          Penalty strokes
+          <select
+            value={penaltyStrokes}
+            onChange={(event) => setPenaltyStrokes(Number(event.target.value))}
+          >
+            <option value="0">None</option>
+            <option value="1">1 stroke</option>
+            <option value="2">2 strokes</option>
+          </select>
+        </label>
+        <label>
+          Club
+          <select value={club} onChange={(event) => setClub(event.target.value)}>
+            <option value="">No club recorded</option>
+            {club && !CLUB_OPTIONS.some((option) => option === club) && (
+              <option value={club}>{club}</option>
+            )}
+            {CLUB_OPTIONS.map((option) => (
+              <option value={option} key={option}>
+                {option}
+              </option>
+            ))}
+            <option value="Other">Other</option>
+          </select>
+        </label>
+      </div>
+      <label>
+        Shot note
+        <textarea
+          maxLength={300}
+          rows={2}
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+        />
+      </label>
+      {error && <div className="error-message">{error}</div>}
+      <div className="shot-editor-actions">
+        <button className="secondary compact" type="button" onClick={onCancel}>
+          Cancel
+        </button>
+        <button className="primary compact" type="submit">
+          Save shot
+        </button>
+      </div>
+    </form>
   )
 }
 
@@ -1487,6 +1692,153 @@ function HoleSetup({
   )
 }
 
+function RoundReview({
+  round,
+  onBack,
+  onEditHole,
+  onFinish,
+}: {
+  round: Round
+  onBack: () => void
+  onEditHole: (index: number) => void
+  onFinish: () => void
+}) {
+  const metrics = calculateRound(round)
+  const totalPar = round.holes.reduce((sum, hole) => sum + hole.par, 0)
+  const totalToPar = metrics.totalStrokes - totalPar
+  const warnings: string[] = []
+  if (metrics.completedHoles !== round.holes.length) {
+    warnings.push(`${round.holes.length - metrics.completedHoles} holes are not complete.`)
+  }
+  if (metrics.totalStrokesGained === null) {
+    warnings.push('One or more shots are outside the active benchmark range.')
+  }
+  if (metrics.penaltyStrokes > 0) {
+    warnings.push(
+      `${metrics.penaltyStrokes} penalty stroke${
+        metrics.penaltyStrokes === 1 ? '' : 's'
+      } recorded.`,
+    )
+  }
+
+  return (
+    <section className="page">
+      <div className="results-heading">
+        <div>
+          <button className="text-button" type="button" onClick={onBack}>
+            ← Back to shot entry
+          </button>
+          <span className="eyebrow">Final check</span>
+          <h1 className="page-title">Review your round</h1>
+        </div>
+        <button
+          className="primary"
+          disabled={metrics.completedHoles !== round.holes.length}
+          type="button"
+          onClick={onFinish}
+        >
+          Finish round
+        </button>
+      </div>
+
+      <div className="metric-grid">
+        <MetricCard
+          label="Total strokes"
+          value={String(metrics.totalStrokes)}
+          detail={`${totalPar} total par`}
+        />
+        <MetricCard
+          label="Score to par"
+          value={formatToPar(totalToPar)}
+          detail={`${round.holes.length} holes`}
+        />
+        <MetricCard
+          label="Strokes gained"
+          value={formatMetric(metrics.strokesGainedPer18)}
+          detail="SG per 18"
+        />
+      </div>
+
+      {warnings.length > 0 && (
+        <div className="review-warnings">
+          {warnings.map((warning) => (
+            <span key={warning}>{warning}</span>
+          ))}
+        </div>
+      )}
+
+      <div className="card round-review-card">
+        <div className="round-review-row table-header">
+          <span>Hole</span>
+          <span>Par</span>
+          <span>Score</span>
+          <span>To par</span>
+          <span>SG</span>
+          <span />
+        </div>
+        {round.holes.map((hole, index) => {
+          const score = hole.shots.reduce(
+            (sum, shot) => sum + 1 + shot.penaltyStrokes,
+            0,
+          )
+          const isComplete = hole.shots.at(-1)?.finish.lie === 'holed'
+          const strokesGained = calculateHoleStrokesGained(hole)
+          return (
+            <div className="round-review-row" key={hole.number}>
+              <strong>{hole.number}</strong>
+              <span>{hole.par || '—'}</span>
+              <span>{score || '—'}</span>
+              <strong
+                className={
+                  !isComplete
+                    ? 'unsupported'
+                    : score - hole.par <= 0
+                      ? 'positive'
+                      : 'negative'
+                }
+              >
+                {isComplete ? formatToPar(score - hole.par) : 'Incomplete'}
+              </strong>
+              <strong
+                className={
+                  strokesGained === null
+                    ? 'unsupported'
+                    : strokesGained >= 0
+                      ? 'positive'
+                      : 'negative'
+                }
+              >
+                {formatMetric(strokesGained)}
+              </strong>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => onEditHole(index)}
+              >
+                Edit
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="review-actions">
+        <button className="secondary" type="button" onClick={onBack}>
+          Back to entry
+        </button>
+        <button
+          className="primary"
+          disabled={metrics.completedHoles !== round.holes.length}
+          type="button"
+          onClick={onFinish}
+        >
+          Confirm and finish
+        </button>
+      </div>
+    </section>
+  )
+}
+
 function Results({
   round,
   allRounds,
@@ -1578,6 +1930,11 @@ function Results({
       )}
     </section>
   )
+}
+
+function formatToPar(value: number): string {
+  if (value === 0) return 'E'
+  return value > 0 ? `+${value}` : String(value)
 }
 
 function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {

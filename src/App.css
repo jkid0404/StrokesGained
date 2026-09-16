@@ -1234,6 +1234,11 @@ textarea:focus {
   padding: 14px 0;
 }
 
+.shot-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .shot-number {
   align-items: center;
   background: var(--green-soft);
@@ -1281,6 +1286,31 @@ textarea:focus {
   color: var(--muted);
   font-size: 12px;
   text-decoration: underline;
+}
+
+.shot-editor {
+  background: #f7f9f6;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  margin: 0 -6px;
+  padding: 18px 6px 20px;
+}
+
+.shot-editor-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.shot-editor label {
+  margin: 0;
+}
+
+.shot-editor-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .shot-form-card {
@@ -1401,6 +1431,46 @@ textarea:focus {
 
 .results-heading {
   margin-top: 0;
+}
+
+.review-warnings {
+  background: #fff8e5;
+  border: 1px solid #edd99f;
+  border-radius: 14px;
+  color: #755b16;
+  display: grid;
+  gap: 5px;
+  margin: 0 0 20px;
+  padding: 14px 18px;
+}
+
+.round-review-card {
+  overflow: hidden;
+}
+
+.round-review-row {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 60px repeat(4, minmax(70px, 1fr)) 60px;
+  padding: 14px 20px;
+}
+
+.round-review-row:first-child {
+  border-top: 0;
+}
+
+.review-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .metric-grid {
@@ -1593,8 +1663,15 @@ textarea:focus {
   }
 
   .shot-row .icon-button {
-    grid-column: 2;
     justify-self: start;
+  }
+
+  .shot-row-actions {
+    grid-column: 2;
+  }
+
+  .shot-editor-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1660,6 +1737,20 @@ textarea:focus {
     font-size: 12px;
     min-width: 570px;
     padding: 13px 12px;
+  }
+
+  .round-review-card {
+    overflow-x: auto;
+  }
+
+  .round-review-row {
+    font-size: 12px;
+    min-width: 580px;
+    padding: 13px 12px;
+  }
+
+  .review-actions {
+    display: grid;
   }
 
   .hero-card h1 {

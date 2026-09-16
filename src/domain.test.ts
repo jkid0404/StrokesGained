@@ -131,16 +131,16 @@ describe('default club', () => {
 })
 
 describe('default distance entry', () => {
-  it('uses 10 feet from the green and 8 feet for approaches finishing on it', () => {
+  it('uses 2 feet from the green and 10 feet for approaches finishing on it', () => {
     expect(
       defaultDistanceEntry({ lie: 'green', distance: 20, unit: 'feet' }, 'green'),
-    ).toBe(10)
+    ).toBe(2)
     expect(
       defaultDistanceEntry({ lie: 'green', distance: 6, unit: 'feet' }, 'holed'),
-    ).toBe(10)
+    ).toBe(2)
     expect(
       defaultDistanceEntry({ lie: 'fairway', distance: 150, unit: 'yards' }, 'green'),
-    ).toBe(8)
+    ).toBe(10)
     expect(
       defaultDistanceEntry({ lie: 'rough', distance: 150, unit: 'yards' }, 'fairway'),
     ).toBe(100)

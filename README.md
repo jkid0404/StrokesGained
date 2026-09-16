@@ -9,7 +9,8 @@ or category strokes gained across the last 5, 10, or 20 matching rounds and
 supports course, tee, date, round-length, and category filters with course/tee
 comparison splits. Shots can optionally record a club and short note, and the
 filtered Trends view summarizes club usage, starting distance, average SG per
-shot, and total SG.
+shot, and total SG. Completed rounds pass through a final scorecard review, and
+individual shots can be edited without discarding the later shot history.
 
 When hosted on Azure Static Web Apps, the app adds private cross-device sync:
 
