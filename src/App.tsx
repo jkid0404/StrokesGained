@@ -33,8 +33,16 @@ import {
 } from './storage'
 import type { LocalState } from './cloudState'
 import { useCloudSync } from './useCloudSync'
+import { Trends } from './Trends'
 
-type View = 'home' | 'setup' | 'entry' | 'results' | 'courses' | 'course-edit'
+type View =
+  | 'home'
+  | 'setup'
+  | 'entry'
+  | 'results'
+  | 'trends'
+  | 'courses'
+  | 'course-edit'
 
 const CATEGORY_LABELS: Record<ShotCategory, string> = {
   'off-the-tee': 'Off the tee',
@@ -88,6 +96,7 @@ function App() {
 
   const activeRound = rounds.find((round) => round.id === activeRoundId) ?? null
   const roundsSelected = view === 'home' || view === 'entry' || view === 'results'
+  const trendsSelected = view === 'trends'
   const coursesSelected = view === 'courses' || view === 'course-edit'
 
   function upsertRound(round: Round) {
@@ -206,6 +215,13 @@ function App() {
               Rounds
             </button>
             <button
+              className={`nav-button ${trendsSelected ? 'active' : ''}`}
+              type="button"
+              onClick={() => setView('trends')}
+            >
+              Trends
+            </button>
+            <button
               className={`nav-button ${coursesSelected ? 'active' : ''}`}
               type="button"
               onClick={() => setView('courses')}
@@ -270,6 +286,7 @@ function App() {
             onCancel={() => setView('home')}
           />
         )}
+        {view === 'trends' && <Trends rounds={rounds} />}
         {view === 'entry' && activeRound && (
           <RoundEntry
             key={`${activeRound.id}-${activeHoleIndex}-${activeRound.holes[activeHoleIndex]?.shots.length ?? 0}`}

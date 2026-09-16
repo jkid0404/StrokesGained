@@ -543,6 +543,214 @@ nav {
   color: var(--muted);
 }
 
+.trend-controls {
+  margin: 24px 0;
+  padding: 24px;
+}
+
+.trend-window-control {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.trend-window-control > span {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.trend-window-control .segmented {
+  min-width: 210px;
+}
+
+.trend-window-control .segmented button {
+  flex: 1;
+}
+
+.trend-filter-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.trend-summary-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 24px 0;
+}
+
+.trend-summary-grid .metric-card strong.positive {
+  color: var(--green);
+}
+
+.trend-summary-grid .metric-card strong.negative {
+  color: var(--red);
+}
+
+.trend-summary-grid .metric-card strong.neutral-metric {
+  color: var(--muted);
+}
+
+.trend-chart-card {
+  margin-bottom: 24px;
+  padding: 24px;
+}
+
+.trend-chart-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.trend-chart-heading h2 {
+  color: var(--ink);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 28px;
+  font-weight: 500;
+  margin: 5px 0 0;
+}
+
+.trend-legend {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 14px;
+}
+
+.trend-legend span {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.trend-legend span::before {
+  content: '';
+  display: inline-block;
+  height: 3px;
+  width: 20px;
+}
+
+.trend-legend-series::before {
+  background: var(--green);
+}
+
+.trend-legend-pga::before {
+  border-top: 2px dashed #708078;
+}
+
+.trend-legend-personal::before {
+  border-top: 2px dashed var(--gold);
+}
+
+.trend-chart-scroll {
+  overflow-x: auto;
+}
+
+.trend-chart {
+  display: block;
+  min-width: 680px;
+  width: 100%;
+}
+
+.trend-grid-line {
+  stroke: #e5eae6;
+  stroke-width: 1;
+}
+
+.trend-axis-label {
+  fill: var(--muted);
+  font-size: 11px;
+  text-anchor: end;
+}
+
+.trend-axis-label.x-axis {
+  text-anchor: middle;
+}
+
+.trend-reference-line {
+  fill: none;
+  stroke-width: 2;
+}
+
+.trend-reference-line.pga {
+  stroke: #708078;
+  stroke-dasharray: 7 6;
+}
+
+.trend-reference-line.personal {
+  stroke: var(--gold);
+  stroke-dasharray: 4 5;
+}
+
+.trend-series-line {
+  fill: none;
+  stroke: var(--green);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.trend-point {
+  stroke: white;
+  stroke-width: 2;
+}
+
+.trend-point.positive {
+  fill: var(--green);
+}
+
+.trend-point.negative {
+  fill: var(--red);
+}
+
+.course-splits-card {
+  overflow: hidden;
+}
+
+.course-split-table {
+  border-top: 1px solid var(--line);
+}
+
+.course-split-row {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(80px, 0.6fr));
+  padding: 15px 22px;
+}
+
+.course-split-row:first-child {
+  border-top: 0;
+}
+
+.course-split-row small,
+.course-split-row strong {
+  display: block;
+}
+
+.course-split-row small {
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.split-empty {
+  margin: 0;
+  padding: 0 22px 22px;
+}
+
+.trend-empty {
+  margin-top: 24px;
+}
+
 .card {
   background: var(--white);
   border: 1px solid var(--line);
@@ -1258,6 +1466,14 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
+  .trend-filter-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .trend-chart-card {
+    padding: 20px 16px;
+  }
+
   .setup-explainer {
     display: grid;
   }
@@ -1315,6 +1531,15 @@ select:focus {
 }
 
 @media (max-width: 480px) {
+  .app-header > button.brand {
+    display: none;
+  }
+
+  .header-controls {
+    justify-content: space-between;
+    width: 100%;
+  }
+
   .auth-card {
     padding: 38px 24px;
   }
@@ -1332,6 +1557,31 @@ select:focus {
   .nav-button {
     font-size: 13px;
     padding: 0 7px;
+  }
+
+  .trend-filter-grid,
+  .trend-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trend-window-control {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .trend-window-control .segmented {
+    min-width: 0;
+  }
+
+  .trend-chart-heading {
+    display: grid;
+  }
+
+  .course-split-row {
+    font-size: 12px;
+    gap: 8px;
+    grid-template-columns: minmax(105px, 1fr) repeat(3, auto);
+    padding: 13px 12px;
   }
 
   .hero-card h1 {

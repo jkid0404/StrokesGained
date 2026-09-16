@@ -4,7 +4,10 @@ A mobile-friendly React/TypeScript app for entering golf rounds and shot
 positions, calculating strokes gained against an approximate PGA Tour benchmark, and
 comparing completed rounds with prior performance. Round setup, reusable course
 and tee templates, wrapped starting-hole order, historical round snapshots, and
-all existing localStorage data remain supported.
+all existing localStorage data remain supported. The Trends page charts total
+or category strokes gained across the last 5, 10, or 20 matching rounds and
+supports course, tee, date, round-length, and category filters with course/tee
+comparison splits.
 
 When hosted on Azure Static Web Apps, the app adds private cross-device sync:
 
