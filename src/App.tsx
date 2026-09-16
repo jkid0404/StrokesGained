@@ -241,6 +241,14 @@ function App() {
             </button>
           </div>
         )}
+        {view === 'entry' &&
+          ['saving', 'offline', 'error'].includes(cloud.syncStatus) && (
+            <div className={`round-sync-banner ${cloud.syncStatus}`} role="status">
+              {cloud.syncStatus === 'offline'
+                ? cloud.syncMessage
+                : 'Sync pending'}
+            </div>
+          )}
         {view === 'home' && (
           <Home
             rounds={rounds}

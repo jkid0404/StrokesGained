@@ -39,6 +39,7 @@ export interface CloudSyncController {
   principal: ClientPrincipal | null
   syncStatus: SyncStatus
   syncMessage: string
+  pendingChanges: number
   canUseApp: boolean
   reloadCloudData: () => void
 }
@@ -54,6 +55,8 @@ export function useCloudSync({
   const [ready, setReady] = useState(false)
   const [retryToken, setRetryToken] = useState(0)
   const [conflictState, setConflictState] = useState<CloudState | null>(null)
+  const [pendingChanges, setPendingChanges] = useState(0)
+  const localFingerprint = stateFingerprint(localState)
 
   const localStateRef = useRef(localState)
   const applyStateRef = useRef(applyState)
@@ -61,12 +64,45 @@ export function useCloudSync({
   const lastSyncedRef = useRef('')
   const initializedOwnerRef = useRef<string | null>(null)
   const saveInFlightRef = useRef(false)
-  const localFingerprint = stateFingerprint(localState)
+  const observedFingerprintRef = useRef(localFingerprint)
+  const pendingChangesRef = useRef(0)
+  const retryAttemptRef = useRef(0)
+  const retryTimerRef = useRef<number | null>(null)
+
+  const updatePendingChanges = useCallback((count: number) => {
+    pendingChangesRef.current = count
+    setPendingChanges(count)
+  }, [])
+
+  const clearRetry = useCallback(() => {
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+  }, [])
+
+  const showSaved = useCallback((updatedAt: string | null) => {
+    setSyncStatus('saved')
+    setSyncMessage(`Saved to cloud · ${formatSyncTime(updatedAt)}`)
+  }, [])
 
   useEffect(() => {
     localStateRef.current = localState
     applyStateRef.current = applyState
   }, [applyState, localState])
+
+  useEffect(() => {
+    if (localFingerprint === observedFingerprintRef.current) return
+    observedFingerprintRef.current = localFingerprint
+    if (
+      initializedOwnerRef.current &&
+      localFingerprint !== lastSyncedRef.current
+    ) {
+      updatePendingChanges(pendingChangesRef.current + 1)
+    }
+  }, [localFingerprint, updatePendingChanges])
+
+  useEffect(() => () => clearRetry(), [clearRetry])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -115,20 +151,24 @@ export function useCloudSync({
 
         if (decision.action === 'upload-local') {
           setSyncStatus('saving')
-          setSyncMessage('Uploading local data…')
+          setSyncMessage('Sync pending')
           const saved = await putCloudState(decision.state, 0, controller.signal)
           revisionRef.current = saved.revision
           lastSyncedRef.current = stateFingerprint(decision.state)
           persistMetadata(ownerId, saved)
+          showSaved(saved.updatedAt)
         } else {
           lastSyncedRef.current = stateFingerprint(decision.state)
           applyStateRef.current(decision.state)
           persistMetadata(ownerId, cloudState)
+          showSaved(cloudState.updatedAt)
         }
 
+        observedFingerprintRef.current = lastSyncedRef.current
+        updatePendingChanges(0)
+        retryAttemptRef.current = 0
+        clearRetry()
         setConflictState(null)
-        setSyncStatus('saved')
-        setSyncMessage('Saved to cloud')
         setReady(true)
       })
       .catch((error: unknown) => {
@@ -153,19 +193,25 @@ export function useCloudSync({
         if (cached?.ownerId === ownerId) {
           revisionRef.current = cached.revision
           lastSyncedRef.current = cached.fingerprint
+          if (stateFingerprint(localStateRef.current) !== cached.fingerprint) {
+            updatePendingChanges(1)
+          }
         } else {
           lastSyncedRef.current = ''
+          if (hasLocalContent(localStateRef.current)) updatePendingChanges(1)
         }
         initializedOwnerRef.current = ownerId
         setSyncStatus(navigator.onLine ? 'error' : 'offline')
         setSyncMessage(
-          navigator.onLine ? 'Cloud unavailable; using cached data' : 'Offline; using cached data',
+          navigator.onLine
+            ? 'Sync pending'
+            : offlineMessage(pendingChangesRef.current),
         )
         setReady(true)
       })
 
     return () => controller.abort()
-  }, [authMode, principal])
+  }, [authMode, clearRetry, principal, showSaved, updatePendingChanges])
 
   useEffect(() => {
     if (
@@ -184,10 +230,11 @@ export function useCloudSync({
 
       const stateToSave = localStateRef.current
       const sentFingerprint = stateFingerprint(stateToSave)
+      const sentChangeCount = Math.max(1, pendingChangesRef.current)
       let savedSuccessfully = false
       saveInFlightRef.current = true
       setSyncStatus('saving')
-      setSyncMessage('Saving…')
+      setSyncMessage('Sync pending')
 
       try {
         const saved = await putCloudState(stateToSave, revisionRef.current)
@@ -195,8 +242,16 @@ export function useCloudSync({
         lastSyncedRef.current = sentFingerprint
         persistMetadata(principal.userId, saved)
         savedSuccessfully = true
-        setSyncStatus('saved')
-        setSyncMessage('Saved to cloud')
+        retryAttemptRef.current = 0
+        clearRetry()
+        if (stateFingerprint(localStateRef.current) === sentFingerprint) {
+          updatePendingChanges(0)
+          showSaved(saved.updatedAt)
+        } else {
+          updatePendingChanges(Math.max(1, pendingChangesRef.current - sentChangeCount))
+          setSyncStatus('saving')
+          setSyncMessage('Sync pending')
+        }
       } catch (error) {
         if (error instanceof CloudConflictError) {
           setConflictState(error.current)
@@ -204,7 +259,20 @@ export function useCloudSync({
           setSyncMessage('Cloud data changed elsewhere')
         } else {
           setSyncStatus(navigator.onLine ? 'error' : 'offline')
-          setSyncMessage(navigator.onLine ? 'Cloud save failed' : 'Offline; changes are local')
+          setSyncMessage(
+            navigator.onLine
+              ? 'Sync pending'
+              : offlineMessage(pendingChangesRef.current),
+          )
+          if (navigator.onLine) {
+            const delay = Math.min(60_000, 2_000 * 2 ** retryAttemptRef.current)
+            retryAttemptRef.current += 1
+            clearRetry()
+            retryTimerRef.current = window.setTimeout(() => {
+              retryTimerRef.current = null
+              setRetryToken((value) => value + 1)
+            }, delay)
+          }
         }
       } finally {
         saveInFlightRef.current = false
@@ -219,16 +287,27 @@ export function useCloudSync({
     }, 900)
 
     return () => window.clearTimeout(timer)
-  }, [authMode, conflictState, localFingerprint, principal, retryToken])
+  }, [
+    authMode,
+    clearRetry,
+    conflictState,
+    localFingerprint,
+    principal,
+    retryToken,
+    showSaved,
+    updatePendingChanges,
+  ])
 
   useEffect(() => {
     const handleOffline = () => {
       if (authMode === 'signed-in') {
         setSyncStatus('offline')
-        setSyncMessage('Offline; changes are local')
+        setSyncMessage(offlineMessage(pendingChangesRef.current))
       }
     }
     const handleOnline = () => {
+      retryAttemptRef.current = 0
+      clearRetry()
       lastSyncedRef.current = ''
       setRetryToken((value) => value + 1)
     }
@@ -238,7 +317,7 @@ export function useCloudSync({
       window.removeEventListener('offline', handleOffline)
       window.removeEventListener('online', handleOnline)
     }
-  }, [authMode])
+  }, [authMode, clearRetry])
 
   const reloadCloudData = useCallback(() => {
     if (!conflictState || !principal) return
@@ -251,18 +330,42 @@ export function useCloudSync({
     lastSyncedRef.current = stateFingerprint(state)
     applyStateRef.current(state)
     persistMetadata(principal.userId, conflictState)
+    observedFingerprintRef.current = lastSyncedRef.current
+    updatePendingChanges(0)
+    retryAttemptRef.current = 0
+    clearRetry()
     setConflictState(null)
-    setSyncStatus('saved')
-    setSyncMessage('Reloaded cloud data')
-  }, [conflictState, principal])
+    showSaved(conflictState.updatedAt)
+  }, [clearRetry, conflictState, principal, showSaved, updatePendingChanges])
 
   return {
     authMode,
     principal,
     syncStatus,
     syncMessage,
+    pendingChanges,
     canUseApp: authMode === 'local' || (authMode === 'signed-in' && ready),
     reloadCloudData,
+  }
+
+  function formatSyncTime(updatedAt: string | null): string {
+    if (!updatedAt) return 'just now'
+    const date = new Date(updatedAt)
+    if (Number.isNaN(date.getTime())) return 'just now'
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  }
+
+  function offlineMessage(pendingChanges: number): string {
+    if (pendingChanges === 0) return 'Offline · Saved locally'
+    return `Offline · ${pendingChanges} change${pendingChanges === 1 ? '' : 's'} saved locally`
+  }
+
+  function hasLocalContent(state: LocalState): boolean {
+    return (
+      state.rounds.length > 0 ||
+      state.courses.length > 0 ||
+      state.deletedCourseKeys.length > 0
+    )
   }
 }
 
