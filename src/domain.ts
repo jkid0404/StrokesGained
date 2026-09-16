@@ -279,7 +279,7 @@ export function defaultClub(
 }
 
 export function defaultDistanceEntry(start: Position, finishLie: Lie): number {
-  if (start.lie === 'green') return 10
+  if (start.lie === 'green') return 2
   return finishLie === 'green' ? 10 : 100
 }
 
