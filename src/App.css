@@ -594,6 +594,29 @@ select:focus {
   padding: 3px;
 }
 
+.hole-count-field {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.hole-count-field legend {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+.hole-count-field .segmented {
+  min-height: 46px;
+}
+
+.hole-count-field .segmented button {
+  flex: 1;
+}
+
 .segmented button {
   background: transparent;
   border: 0;

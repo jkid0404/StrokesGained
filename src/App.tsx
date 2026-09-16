@@ -549,18 +549,6 @@ function RoundSetup({
           <span className="eyebrow">Round setup</span>
           <h1 className="page-title">Start your round</h1>
         </div>
-        <div className="segmented">
-          {[9, 18].map((count) => (
-            <button
-              className={holeCount === count ? 'active' : ''}
-              key={count}
-              type="button"
-              onClick={() => setHoleCount(count as 9 | 18)}
-            >
-              {count} holes
-            </button>
-          ))}
-        </div>
       </div>
 
       <form onSubmit={submit}>
@@ -623,6 +611,21 @@ function RoundSetup({
               ))}
             </select>
           </label>
+          <fieldset className="hole-count-field">
+            <legend>Round length</legend>
+            <div className="segmented">
+              {[9, 18].map((count) => (
+                <button
+                  className={holeCount === count ? 'active' : ''}
+                  key={count}
+                  type="button"
+                  onClick={() => setHoleCount(count as 9 | 18)}
+                >
+                  {count} holes
+                </button>
+              ))}
+            </div>
+          </fieldset>
         </div>
         <div className="setup-explainer">
           <strong>
