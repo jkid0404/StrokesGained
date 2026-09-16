@@ -565,7 +565,6 @@ function RoundSetup({
           <label>
             Course
             <select
-              autoFocus
               value={selectedCourseKey}
               onChange={(event) => {
                 const key = event.target.value
