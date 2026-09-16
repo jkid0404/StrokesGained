@@ -129,7 +129,6 @@ function App() {
     view === 'home' || view === 'entry' || view === 'review' || view === 'results'
   const trendsSelected = view === 'trends'
   const coursesSelected = view === 'courses' || view === 'course-edit'
-  const bagSelected = view === 'bag'
 
   function upsertRound(round: Round) {
     setRounds((current) => {
@@ -261,13 +260,6 @@ function App() {
               Courses
             </button>
             <button
-              className={`nav-button ${bagSelected ? 'active' : ''}`}
-              type="button"
-              onClick={() => setView('bag')}
-            >
-              Bag
-            </button>
-            <button
               className={`nav-button new-round ${view === 'setup' ? 'active' : ''}`}
               type="button"
               onClick={() => setView('setup')}
@@ -320,7 +312,9 @@ function App() {
         )}
         {view === 'home' && (
           <Home
+            clubCount={clubs.length}
             rounds={rounds}
+            onManageBag={() => setView('bag')}
             onNew={() => setView('setup')}
             onOpen={(round) => {
               const firstIncomplete = round.holes.findIndex(
@@ -520,11 +514,15 @@ function DelayedRoundSyncBanner({
 }
 
 function Home({
+  clubCount,
   rounds,
+  onManageBag,
   onNew,
   onOpen,
 }: {
+  clubCount: number
   rounds: Round[]
+  onManageBag: () => void
   onNew: () => void
   onOpen: (round: Round) => void
 }) {
@@ -561,6 +559,20 @@ function Home({
             }
           />
         </div>
+      </div>
+
+      <div className="home-management-card card">
+        <div>
+          <span className="eyebrow">Club presets</span>
+          <h2>My Bag</h2>
+          <p>
+            {clubCount} club{clubCount === 1 ? '' : 's'} available during shot
+            entry.
+          </p>
+        </div>
+        <button className="secondary" type="button" onClick={onManageBag}>
+          Manage clubs
+        </button>
       </div>
 
       <div className="section-heading">
