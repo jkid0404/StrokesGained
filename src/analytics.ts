@@ -150,10 +150,15 @@ export function buildClubAnalytics(
         if (category !== 'total' && result.category !== category) return
 
         const normalizedClub = club.toLocaleLowerCase()
-        const bucket = clubDistanceBucket(
+        const normalizedDistance = clubAnalyticsDistance(
           normalizedClub,
           shot.start.distance,
           shot.start.unit,
+        )
+        const bucket = clubDistanceBucket(
+          normalizedClub,
+          normalizedDistance.distance,
+          normalizedDistance.unit,
         )
         const key = `${normalizedClub}::${bucket.key}`
         const group = groups.get(key) ?? {
@@ -164,8 +169,8 @@ export function buildClubAnalytics(
           units: new Set<'yards' | 'feet'>(),
         }
         group.strokesGained.push(result.strokesGained)
-        group.distances.push(shot.start.distance)
-        group.units.add(shot.start.unit)
+        group.distances.push(normalizedDistance.distance)
+        group.units.add(normalizedDistance.unit)
         groups.set(key, group)
       })
     }
@@ -205,12 +210,11 @@ function clubDistanceBucket(
   const displayedDistance = Math.round(distance)
 
   if (normalizedClub === 'putter') {
-    if (unit !== 'feet') return { key: 'off-green', label: 'Off green' }
     if (displayedDistance <= 2) return { key: '0-2', label: '0–2 ft' }
     if (displayedDistance <= 6) return { key: '3-6', label: '3–6 ft' }
     if (displayedDistance <= 15) return { key: '7-15', label: '7–15 ft' }
     if (displayedDistance <= 30) return { key: '16-30', label: '16–30 ft' }
-    return { key: '30-plus', label: '30+ ft' }
+    return { key: '31-plus', label: '31+ ft' }
   }
 
   if (normalizedClub === '58 wedge') {
@@ -221,6 +225,20 @@ function clubDistanceBucket(
   }
 
   return { key: 'all', label: null }
+}
+
+function clubAnalyticsDistance(
+  normalizedClub: string,
+  distance: number,
+  unit: 'yards' | 'feet',
+): { distance: number; unit: 'yards' | 'feet' } {
+  if (normalizedClub === 'putter') {
+    return {
+      distance: unit === 'yards' ? distance * 3 : distance,
+      unit: 'feet',
+    }
+  }
+  return { distance, unit }
 }
 
 function clubOrderIndex(club: string, clubOrder: readonly string[]): number {
@@ -242,8 +260,7 @@ function clubBucketOrder(key: string): number {
     '66-plus': 2,
     '16-30': 3,
     'other-unit': 3,
-    '30-plus': 4,
-    'off-green': 5,
+    '31-plus': 4,
     all: 0,
   }
   return orders[band] ?? 0

@@ -113,7 +113,7 @@ describe('trend analytics', () => {
       ['Putter', '3–6 ft', 1],
       ['Putter', '7–15 ft', 1],
       ['Putter', '16–30 ft', 1],
-      ['Putter', '30+ ft', 1],
+      ['Putter', '31+ ft', 1],
     ])
   })
 
@@ -130,6 +130,33 @@ describe('trend analytics', () => {
 
     expect(metrics.find((metric) => metric.key === 'putter::0-2')?.shots).toBe(1)
     expect(metrics.find((metric) => metric.key === '58 wedge::0-30')?.shots).toBe(1)
+  })
+
+  it('converts off-green Putter distances from yards to feet', () => {
+    const round = makeBucketRound()
+    round.holes.push({
+      number: 9,
+      par: 4,
+      yardage: 400,
+      shots: [
+        {
+          id: 'putter-off-green',
+          start: { lie: 'fairway', distance: 12, unit: 'yards' },
+          finish: { lie: 'holed', distance: 0, unit: 'feet' },
+          penaltyStrokes: 0,
+          club: 'Putter',
+        },
+      ],
+    })
+
+    const metric = buildClubAnalytics([round], 'total', ['Putter']).find(
+      (item) => item.key === 'putter::31-plus',
+    )
+
+    expect(metric?.distanceBand).toBe('31+ ft')
+    expect(metric?.distanceUnit).toBe('feet')
+    expect(metric?.shots).toBe(2)
+    expect(metric?.averageDistance).toBe(38)
   })
 })
 
