@@ -92,8 +92,10 @@ without returning the Cosmos credential to the caller:
 
 The script then prints the command for retrieving the Static Web Apps deployment
 token. The client SPA stays anonymously loadable so React can present a sign-in
-screen; `/api/*` requires the `authenticated` role and the API additionally
-enforces the single-user email allowlist.
+screen. The API validates the trusted Static Web Apps principal header and
+enforces the single-user email allowlist itself. This avoids a duplicate route
+role gate that can reject valid personal Microsoft identities before the
+function receives them.
 
 Provisioned Azure resources:
 
