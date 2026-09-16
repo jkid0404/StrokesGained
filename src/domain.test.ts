@@ -14,11 +14,15 @@ import {
   type Shot,
 } from './domain'
 
-describe('excerpt benchmark', () => {
-  it('returns documented anchor values', () => {
+describe('Kaggle benchmark', () => {
+  it('returns values from the imported shot and putting tables', () => {
+    expect(BENCHMARK_VERSION).toBe('kaggle-evancallaghan-v1-2023')
+    expect(expectedStrokes({ lie: 'fairway', distance: 3, unit: 'yards' })).toBe(2)
     expect(expectedStrokes({ lie: 'fairway', distance: 100, unit: 'yards' })).toBe(2.8)
     expect(expectedStrokes({ lie: 'sand', distance: 20, unit: 'yards' })).toBe(2.53)
     expect(expectedStrokes({ lie: 'green', distance: 8, unit: 'feet' })).toBe(1.5)
+    expect(expectedStrokes({ lie: 'tee', distance: 600, unit: 'yards' })).toBe(4.82)
+    expect(expectedStrokes({ lie: 'green', distance: 90, unit: 'feet' })).toBe(2.4)
   })
 
   describe('hole sequence', () => {
@@ -38,15 +42,20 @@ describe('excerpt benchmark', () => {
     })
   })
 
-  it('interpolates inside the provisional ranges and rejects values beyond them', () => {
-    expect(expectedStrokes({ lie: 'fairway', distance: 60, unit: 'yards' })).toBeCloseTo(2.6)
-    expect(expectedStrokes({ lie: 'green', distance: 4, unit: 'feet' })).toBe(1.14)
-    expect(expectedStrokes({ lie: 'tee', distance: 700, unit: 'yards' })).toBe(5.25)
-    expect(() => expectedStrokes({ lie: 'green', distance: 121, unit: 'feet' })).toThrow(
-      'supports 1-120 ft',
+  it('interpolates decimal distances and rejects values outside the dataset', () => {
+    expect(expectedStrokes({ lie: 'fairway', distance: 60, unit: 'yards' })).toBe(2.7)
+    expect(expectedStrokes({ lie: 'green', distance: 4, unit: 'feet' })).toBe(1.13)
+    expect(expectedStrokes({ lie: 'fairway', distance: 3.5, unit: 'yards' })).toBeCloseTo(
+      2.015,
     )
-    expect(() => expectedStrokes({ lie: 'tee', distance: 701, unit: 'yards' })).toThrow(
-      'supports 1-700 yd',
+    expect(() => expectedStrokes({ lie: 'green', distance: 91, unit: 'feet' })).toThrow(
+      'supports 1-90 ft',
+    )
+    expect(() => expectedStrokes({ lie: 'tee', distance: 99, unit: 'yards' })).toThrow(
+      'supports 100-600 yd',
+    )
+    expect(() => expectedStrokes({ lie: 'fairway', distance: 601, unit: 'yards' })).toThrow(
+      'supports 3-600 yd',
     )
   })
 })
@@ -64,12 +73,12 @@ describe('strokes gained calculations', () => {
   })
 
   it('marks a round unsupported when any shot is outside benchmark coverage', () => {
-    const round = makeRound('unsupported', '2026-01-01', 701)
+    const round = makeRound('unsupported', '2026-01-01', 601)
     expect(calculateRound(round).totalStrokesGained).toBeNull()
   })
 
-  it('supports tee shots through 700 yards', () => {
-    const round = makeRound('supported', '2026-01-01', 700)
+  it('supports tee shots through 600 yards', () => {
+    const round = makeRound('supported', '2026-01-01', 600)
     expect(calculateRound(round).totalStrokesGained).not.toBeNull()
   })
 })

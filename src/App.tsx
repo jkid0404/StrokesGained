@@ -1315,7 +1315,7 @@ function Results({
 
       {metrics.totalStrokesGained === null && (
         <div className="warning-message">
-          Some shots fall outside the excerpt-derived benchmark ranges, so the round SG total is
+          Some shots fall outside the Kaggle benchmark ranges, so the round SG total is
           intentionally unavailable rather than estimated.
         </div>
       )}

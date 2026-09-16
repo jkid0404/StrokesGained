@@ -1,7 +1,7 @@
 # Golf Strokes Gained
 
 A mobile-friendly React/TypeScript app for entering golf rounds and shot
-positions, calculating strokes gained against a provisional benchmark, and
+positions, calculating strokes gained against an approximate PGA Tour benchmark, and
 comparing completed rounds with prior performance. Round setup, reusable course
 and tee templates, wrapped starting-hole order, historical round snapshots, and
 all existing localStorage data remain supported.
@@ -130,19 +130,22 @@ npm test --prefix api
 npm run build --prefix api
 ```
 
-## Benchmark limitations
+## Benchmark source and limitations
 
-The prototype uses a provisional synthetic curve anchored to the Broadie excerpts
-selected during planning:
+The active benchmark is version `kaggle-evancallaghan-v1-2023` and uses the CSV
+files from Evan Callaghan's Kaggle dataset, [PGA Tour Strokes Gained Baseline
+Values](https://www.kaggle.com/datasets/evancallaghan/pga-tour-strokes-gained-baseline-values).
 
-- Documented off-green anchors at 20, 100, and 400 yards, where available.
-- Documented putting anchors at 8 and 33 feet.
-- Synthetic short-game, putting, and long-shot anchors for normal app coverage.
-- Off-green coverage from 1-700 yards.
-- Putting coverage from 1-120 feet.
-- Linear interpolation is allowed only between adjacent anchors.
-- Inputs outside those ranges are rejected rather than extrapolated.
+- Tee coverage: 100-600 yards.
+- Fairway, rough, and sand coverage: 3-600 yards.
+- Putting coverage: 1-90 feet.
+- Decimal distances use linear interpolation between adjacent CSV rows.
+- Recovery remains calculation-only for legacy rounds because the Kaggle data
+  has no recovery column.
+- Inputs outside the source ranges are rejected rather than extrapolated.
 
-Synthetic points are engineering estimates, not PGA Tour values. This is not the
-complete Broadie table and is not the current official PGA Tour baseline. Replace
-it with a licensed, versioned benchmark before production use.
+The dataset author says values were aggregated from Mark Broadie's *Every Shot
+Counts* (2014), completed using cubic-spline interpolation and short-distance
+extrapolation, rounded to two decimals, and are approximate. Kaggle identifies
+the license as **Other (specified in description)** without a standard license
+identifier. See `src/data/README.md` for retained provenance.

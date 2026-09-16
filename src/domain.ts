@@ -97,7 +97,7 @@ export interface CumulativeMetrics {
   personalRoundCount: number
 }
 
-export const BENCHMARK_VERSION = 'provisional-synthetic-v2'
+export const BENCHMARK_VERSION = 'kaggle-evancallaghan-v1-2023'
 
 export function buildHoleSequence(count: 9 | 18, startingHole: number): Hole[] {
   const normalizedStart = Math.min(18, Math.max(1, Math.round(startingHole)))
@@ -177,9 +177,9 @@ export const LIE_LABELS: Record<Lie, string> = {
   holed: 'Holed',
 }
 
-type Anchor = { distance: number; expected: number }
+type Anchor = BaselineAnchor
 
-const BENCHMARKS: Record<Exclude<Lie, 'holed'>, Anchor[]> = {
+const LEGACY_BENCHMARKS: Record<Exclude<Lie, 'holed'>, Anchor[]> = {
   tee: [
     { distance: 1, expected: 1.95 },
     { distance: 5, expected: 2.05 },
@@ -277,6 +277,11 @@ const BENCHMARKS: Record<Exclude<Lie, 'holed'>, Anchor[]> = {
   ],
 }
 
+const BENCHMARKS: Record<Exclude<Lie, 'holed'>, Anchor[]> = {
+  ...KAGGLE_BASELINES,
+  recovery: LEGACY_BENCHMARKS.recovery,
+}
+
 export function benchmarkRange(lie: Lie): string {
   if (lie === 'holed') return '0'
   const anchors = BENCHMARKS[lie]
@@ -297,7 +302,7 @@ export function expectedStrokes(position: Position): number {
   const last = anchors.at(-1)!
   if (position.distance < first.distance || position.distance > last.distance) {
     throw new Error(
-      `${LIE_LABELS[position.lie]} supports ${benchmarkRange(position.lie)} in the prototype benchmark.`,
+      `${LIE_LABELS[position.lie]} supports ${benchmarkRange(position.lie)} in the active benchmark.`,
     )
   }
 
@@ -500,3 +505,7 @@ export function formatMetric(value: number | null, digits = 2): string {
   if (value === null) return 'N/A'
   return `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`
 }
+import {
+  KAGGLE_BASELINES,
+  type BaselineAnchor,
+} from './data/baselineData'
