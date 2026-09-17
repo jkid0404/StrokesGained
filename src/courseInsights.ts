@@ -1,10 +1,15 @@
 import {
+  buildStrokesGainedSummary,
+  type StrokesGainedSummary,
+} from './analytics'
+import {
   calculateRound,
   calculateShot,
   courseKey,
   type CourseTemplate,
   type Hole,
   type Round,
+  type ShotCategory,
 } from './domain'
 import {
   calculateTraditionalStats,
@@ -19,6 +24,7 @@ export interface CourseHoleInsight {
   averageScore: number
   averageToPar: number
   averageStrokesGained: number | null
+  strokesGainedCategories: Record<ShotCategory, number | null>
   supportedStrokesGainedRounds: number
   fairways: CountMetric
   greensInRegulation: CountMetric
@@ -33,6 +39,7 @@ export interface CourseInsights {
   latestPlayedOn: string | null
   bestScoreToParPer18: number | null
   averageStrokesGainedPer18: number | null
+  strokesGainedSummary: StrokesGainedSummary
   traditionalStats: TraditionalStats
   holes: CourseHoleInsight[]
   troubleHoles: CourseHoleInsight[]
@@ -44,6 +51,8 @@ interface HoleAccumulator {
   scores: number[]
   scoreToPar: number[]
   strokesGained: number[]
+  strokesGainedCategoryTotals: Record<ShotCategory, number>
+  strokesGainedCategoryShots: Record<ShotCategory, number>
   fairways: CountMetric
   greensInRegulation: CountMetric
   putts: number
@@ -77,6 +86,8 @@ export function buildCourseInsights(
         scores: [],
         scoreToPar: [],
         strokesGained: [],
+        strokesGainedCategoryTotals: categoryRecord(0),
+        strokesGainedCategoryShots: categoryRecord(0),
         fairways: { made: 0, opportunities: 0 },
         greensInRegulation: { made: 0, opportunities: 0 },
         putts: 0,
@@ -87,7 +98,17 @@ export function buildCourseInsights(
       group.pars.push(hole.par)
       group.scores.push(stats.totalStrokes)
       group.scoreToPar.push(stats.scoreToPar)
-      if (strokesGained !== null) group.strokesGained.push(strokesGained)
+      if (strokesGained !== null) {
+        group.strokesGained.push(strokesGained.total)
+        for (const category of Object.keys(
+          strokesGained.categories,
+        ) as ShotCategory[]) {
+          group.strokesGainedCategoryTotals[category] +=
+            strokesGained.categories[category].total
+          group.strokesGainedCategoryShots[category] +=
+            strokesGained.categories[category].shots
+        }
+      }
       addCountMetric(group.fairways, stats.fairways)
       addCountMetric(group.greensInRegulation, stats.greensInRegulation)
       group.putts += stats.putts
@@ -125,6 +146,7 @@ export function buildCourseInsights(
       scoreToParValues.length > 0 ? Math.min(...scoreToParValues) : null,
     averageStrokesGainedPer18:
       roundSgValues.length > 0 ? mean(roundSgValues) : null,
+    strokesGainedSummary: buildStrokesGainedSummary(matchingRounds),
     traditionalStats: calculateTraditionalStats(matchingRounds),
     holes,
     troubleHoles: [...holes]
@@ -151,6 +173,17 @@ function toHoleInsight(group: HoleAccumulator): CourseHoleInsight {
     averageToPar: mean(group.scoreToPar),
     averageStrokesGained:
       group.strokesGained.length > 0 ? mean(group.strokesGained) : null,
+    strokesGainedCategories: Object.fromEntries(
+      (Object.keys(group.strokesGainedCategoryTotals) as ShotCategory[]).map(
+        (category) => [
+          category,
+          group.strokesGainedCategoryShots[category]
+            ? group.strokesGainedCategoryTotals[category] /
+              group.strokesGainedCategoryShots[category]
+            : null,
+        ],
+      ),
+    ) as Record<ShotCategory, number | null>,
     supportedStrokesGainedRounds: group.strokesGained.length,
     fairways: group.fairways,
     greensInRegulation: group.greensInRegulation,
@@ -160,15 +193,33 @@ function toHoleInsight(group: HoleAccumulator): CourseHoleInsight {
   }
 }
 
-function calculateHoleStrokesGained(hole: Hole): number | null {
+function calculateHoleStrokesGained(hole: Hole): {
+  total: number
+  categories: Record<ShotCategory, { total: number; shots: number }>
+} | null {
   const values = hole.shots.map((shot, index) =>
     calculateShot(shot, index, hole.par),
   )
   if (values.some((value) => value.strokesGained === null)) return null
-  return values.reduce(
-    (total, value) => total + (value.strokesGained ?? 0),
-    0,
-  )
+  const categories = {
+    'off-the-tee': { total: 0, shots: 0 },
+    approach: { total: 0, shots: 0 },
+    'around-the-green': { total: 0, shots: 0 },
+    putting: { total: 0, shots: 0 },
+  } satisfies Record<ShotCategory, { total: number; shots: number }>
+
+  for (const value of values) {
+    categories[value.category].total += value.strokesGained ?? 0
+    categories[value.category].shots += 1
+  }
+
+  return {
+    total: values.reduce(
+      (total, value) => total + (value.strokesGained ?? 0),
+      0,
+    ),
+    categories,
+  }
 }
 
 function addCountMetric(target: CountMetric, value: CountMetric): void {
@@ -178,4 +229,13 @@ function addCountMetric(target: CountMetric, value: CountMetric): void {
 
 function mean(values: number[]): number {
   return values.reduce((total, value) => total + value, 0) / values.length
+}
+
+function categoryRecord<T>(value: T): Record<ShotCategory, T> {
+  return {
+    'off-the-tee': value,
+    approach: value,
+    'around-the-green': value,
+    putting: value,
+  }
 }

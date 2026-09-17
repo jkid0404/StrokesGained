@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import {
   buildClubAnalytics,
+  buildStrokesGainedSummary,
   buildTrendPoints,
   filterTrendRounds,
   personalTrendReference,
@@ -21,6 +22,7 @@ import {
   type TraditionalTrendMetric,
 } from './traditionalStats'
 import { TraditionalStatsPanel } from './TraditionalStatsPanel'
+import { StrokesGainedSummary } from './StrokesGainedSummary'
 
 const CATEGORY_LABELS: Record<ShotCategory, string> = {
   'off-the-tee': 'Off the tee',
@@ -102,6 +104,7 @@ export function Trends({
     [courseName, fromDate, roundLength, rounds, teeName, toDate],
   )
   const displayedRounds = filteredRounds.slice(-windowSize)
+  const strokesGainedSummary = buildStrokesGainedSummary(displayedRounds)
   const traditionalStats = calculateTraditionalStats(displayedRounds)
   const isStrokesGained = selectedMetric.startsWith('sg:')
   const sgCategory = isStrokesGained
@@ -309,6 +312,13 @@ export function Trends({
             }}
             points={points}
             showPgaReference={isStrokesGained}
+          />
+
+          <StrokesGainedSummary
+            context={`Last ${displayedRounds.length} matching round${
+              displayedRounds.length === 1 ? '' : 's'
+            }`}
+            summary={strokesGainedSummary}
           />
 
           <TraditionalStatsPanel

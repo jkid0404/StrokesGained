@@ -671,6 +671,58 @@ nav {
   color: var(--muted);
 }
 
+.strokes-gained-summary-card {
+  margin: 24px 0;
+  overflow: hidden;
+}
+
+.strokes-gained-summary-card > .section-heading {
+  padding: 0 22px;
+}
+
+.strokes-gained-summary-grid {
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.strokes-gained-summary-metric {
+  border-right: 1px solid var(--line);
+  padding: 18px;
+}
+
+.strokes-gained-summary-metric:last-child {
+  border-right: 0;
+}
+
+.strokes-gained-summary-metric span,
+.strokes-gained-summary-metric strong,
+.strokes-gained-summary-metric small {
+  display: block;
+}
+
+.strokes-gained-summary-metric span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.strokes-gained-summary-metric strong {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 27px;
+  margin: 7px 0 4px;
+}
+
+.strokes-gained-summary-metric strong.neutral-metric,
+.course-hole-row strong.neutral-metric {
+  color: var(--muted);
+}
+
+.strokes-gained-summary-metric small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .traditional-stats-card {
   margin: 24px 0;
   overflow: hidden;
@@ -1153,7 +1205,7 @@ textarea:focus {
 }
 
 .course-hole-table {
-  min-width: 940px;
+  min-width: 1280px;
 }
 
 .course-hole-row {
@@ -1161,7 +1213,7 @@ textarea:focus {
   border-top: 1px solid var(--line);
   display: grid;
   gap: 14px;
-  grid-template-columns: 70px 90px repeat(7, minmax(82px, 1fr));
+  grid-template-columns: 70px 90px repeat(11, minmax(82px, 1fr));
   padding: 14px 22px;
 }
 
@@ -1873,6 +1925,22 @@ button:disabled {
 
   .traditional-stat-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .strokes-gained-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .strokes-gained-summary-metric {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .strokes-gained-summary-metric:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .strokes-gained-summary-metric:last-child {
+    border-bottom: 0;
   }
 
   .traditional-stat,

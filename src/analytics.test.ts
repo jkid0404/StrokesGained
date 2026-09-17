@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildClubAnalytics,
   buildCourseSplits,
+  buildStrokesGainedSummary,
   filterTrendRounds,
   personalTrendReference,
   trendValue,
@@ -18,6 +19,19 @@ const allFilters: TrendFilters = {
 }
 
 describe('trend analytics', () => {
+  it('summarizes total and category strokes gained across rounds', () => {
+    const summary = buildStrokesGainedSummary([
+      makeRound('one', 'Alpha', 'Blue', '2026-01-01', 9, 400),
+      makeRound('two', 'Alpha', 'Blue', '2026-01-02', 9, 425),
+    ])
+
+    expect(summary.supportedRounds).toBe(2)
+    expect(summary.totalPer18).not.toBeNull()
+    expect(summary.categories['off-the-tee'].shots).toBe(18)
+    expect(summary.categories['off-the-tee'].perShot).not.toBeNull()
+    expect(summary.categories.putting).toEqual({ perShot: null, shots: 0 })
+  })
+
   it('filters completed rounds by course, tee, date, and round length', () => {
     const rounds = [
       makeRound('one', 'Alpha', 'Blue', '2026-01-01', 9, 400),

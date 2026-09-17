@@ -1,6 +1,7 @@
 import { buildCourseInsights } from './courseInsights'
 import { formatMetric, type CourseTemplate, type Round } from './domain'
 import { TraditionalStatsPanel } from './TraditionalStatsPanel'
+import { StrokesGainedSummary } from './StrokesGainedSummary'
 
 export function CourseInsightsPage({
   course,
@@ -66,6 +67,11 @@ export function CourseInsightsPage({
             />
           </div>
 
+          <StrokesGainedSummary
+            context={`${course.name} · ${course.teeName}`}
+            summary={insights.strokesGainedSummary}
+          />
+
           <TraditionalStatsPanel
             context={`${course.name} · ${course.teeName}`}
             stats={insights.traditionalStats}
@@ -112,6 +118,10 @@ export function CourseInsightsPage({
                   <span>Avg score</span>
                   <span>To par</span>
                   <span>Avg SG</span>
+                  <span>SG/shot: Tee</span>
+                  <span>SG/shot: Approach</span>
+                  <span>SG/shot: Short</span>
+                  <span>SG/shot: Putting</span>
                   <span>Fairway</span>
                   <span>GIR</span>
                   <span>Putts</span>
@@ -144,6 +154,12 @@ export function CourseInsightsPage({
                     >
                       {formatMetric(hole.averageStrokesGained)}
                     </strong>
+                    <CategoryMetric value={hole.strokesGainedCategories['off-the-tee']} />
+                    <CategoryMetric value={hole.strokesGainedCategories.approach} />
+                    <CategoryMetric
+                      value={hole.strokesGainedCategories['around-the-green']}
+                    />
+                    <CategoryMetric value={hole.strokesGainedCategories.putting} />
                     <span>{formatCountMetric(hole.fairways)}</span>
                     <span>{formatCountMetric(hole.greensInRegulation)}</span>
                     <span>{hole.averagePutts.toFixed(2)}</span>
@@ -156,6 +172,22 @@ export function CourseInsightsPage({
         </>
       )}
     </section>
+  )
+}
+
+function CategoryMetric({ value }: { value: number | null }) {
+  return (
+    <strong
+      className={
+        value === null
+          ? 'neutral-metric'
+          : value >= 0
+            ? 'positive'
+            : 'negative'
+      }
+    >
+      {formatMetric(value)}
+    </strong>
   )
 }
 

@@ -63,6 +63,13 @@ describe('course and hole insights', () => {
     expect(insights.troubleHoles[0].established).toBe(true)
     expect(insights.traditionalStats.holesPlayed).toBe(6)
     expect(insights.averageStrokesGainedPer18).not.toBeNull()
+    expect(insights.strokesGainedSummary.totalPer18).not.toBeNull()
+    expect(insights.strokesGainedSummary.categories['off-the-tee'].shots).toBe(6)
+    expect(
+      insights.holes[0].strokesGainedCategories['off-the-tee'],
+    ).not.toBeNull()
+    expect(insights.holes[0].strokesGainedCategories.approach).not.toBeNull()
+    expect(insights.holes[0].strokesGainedCategories.putting).not.toBeNull()
   })
 
   it('returns empty insight values when a course has no completed rounds', () => {
@@ -71,6 +78,7 @@ describe('course and hole insights', () => {
     expect(insights.rounds).toBe(0)
     expect(insights.latestPlayedOn).toBeNull()
     expect(insights.averageStrokesGainedPer18).toBeNull()
+    expect(insights.strokesGainedSummary.totalPer18).toBeNull()
     expect(insights.holes).toEqual([])
   })
 

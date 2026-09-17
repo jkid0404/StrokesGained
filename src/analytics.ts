@@ -23,6 +23,18 @@ export interface TrendPoint {
   value: number | null
 }
 
+export interface StrokesGainedSummary {
+  totalPer18: number | null
+  supportedRounds: number
+  categories: Record<
+    ShotCategory,
+    {
+      perShot: number | null
+      shots: number
+    }
+  >
+}
+
 export interface CourseSplit {
   key: string
   courseName: string
@@ -85,6 +97,54 @@ export function personalTrendReference(
   const baseline = buildPersonalBaseline(rounds)
   if (category === 'total') return baseline.averageSgPer18
   return baseline.categoryPerShot[category] ?? null
+}
+
+export function buildStrokesGainedSummary(
+  rounds: Round[],
+): StrokesGainedSummary {
+  const categorySeed = () => ({ total: 0, shots: 0 })
+  const categories = {
+    'off-the-tee': categorySeed(),
+    approach: categorySeed(),
+    'around-the-green': categorySeed(),
+    putting: categorySeed(),
+  } satisfies Record<ShotCategory, { total: number; shots: number }>
+  const totalPer18: number[] = []
+
+  for (const round of rounds) {
+    const metrics = calculateRound(round)
+    if (
+      metrics.supportedShots !== metrics.totalShots ||
+      metrics.totalStrokesGained === null ||
+      metrics.completedHoles === 0
+    ) {
+      continue
+    }
+
+    totalPer18.push(
+      (metrics.totalStrokesGained / metrics.completedHoles) * 18,
+    )
+    for (const category of Object.keys(categories) as ShotCategory[]) {
+      categories[category].total += metrics.categories[category].total
+      categories[category].shots += metrics.categories[category].shots
+    }
+  }
+
+  return {
+    totalPer18: totalPer18.length ? mean(totalPer18) : null,
+    supportedRounds: totalPer18.length,
+    categories: Object.fromEntries(
+      (Object.keys(categories) as ShotCategory[]).map((category) => [
+        category,
+        {
+          perShot: categories[category].shots
+            ? categories[category].total / categories[category].shots
+            : null,
+          shots: categories[category].shots,
+        },
+      ]),
+    ) as StrokesGainedSummary['categories'],
+  }
 }
 
 export function buildCourseSplits(
