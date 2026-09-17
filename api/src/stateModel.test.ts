@@ -26,6 +26,7 @@ describe('cloud state validation', () => {
             key: 'test course::blue',
             name: 'Test course',
             teeName: 'Blue',
+            aliases: ['old test course::blue'],
             holes: { 1: { par: 4, yardage: 410 } },
           },
         ],

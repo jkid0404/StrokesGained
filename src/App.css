@@ -764,6 +764,36 @@ nav {
   padding: 14px 22px 18px;
 }
 
+.traditional-trend-controls {
+  align-items: end;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  margin-bottom: 16px;
+}
+
+.traditional-trend-summary {
+  display: flex;
+  gap: 28px;
+}
+
+.traditional-trend-summary span,
+.traditional-trend-summary small,
+.traditional-trend-summary strong {
+  display: block;
+}
+
+.traditional-trend-summary small {
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.traditional-trend-summary strong {
+  color: var(--ink);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 24px;
+}
+
 .trend-chart-card {
   margin-bottom: 24px;
   padding: 24px;
@@ -879,6 +909,10 @@ nav {
 
 .trend-point.negative {
   fill: var(--red);
+}
+
+.trend-point.neutral {
+  fill: var(--green);
 }
 
 .course-splits-card {
@@ -1085,7 +1119,9 @@ textarea:focus {
 
 .course-row-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
 }
 
 .danger-button {
@@ -1105,6 +1141,88 @@ textarea:focus {
 .course-row small {
   color: var(--muted);
   margin-top: 4px;
+}
+
+.course-insight-summary {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.trouble-holes-card,
+.course-hole-card {
+  overflow: hidden;
+}
+
+.trouble-hole-grid {
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.trouble-hole {
+  border-right: 1px solid var(--line);
+  padding: 20px 22px;
+}
+
+.trouble-hole:last-child {
+  border-right: 0;
+}
+
+.trouble-hole span,
+.trouble-hole strong,
+.trouble-hole small {
+  display: block;
+}
+
+.trouble-hole span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.trouble-hole strong {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 30px;
+  margin: 6px 0 4px;
+}
+
+.trouble-hole small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.course-hole-scroll {
+  border-top: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.course-hole-table {
+  min-width: 940px;
+}
+
+.course-hole-row {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 70px 90px repeat(7, minmax(82px, 1fr));
+  padding: 14px 22px;
+}
+
+.course-hole-row:first-child {
+  border-top: 0;
+}
+
+.course-hole-row small,
+.course-hole-row strong {
+  display: block;
+}
+
+.course-hole-row small {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 3px;
 }
 
 .bag-description {
@@ -1798,6 +1916,15 @@ button:disabled {
     padding: 20px 16px;
   }
 
+  .traditional-trend-controls {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .traditional-trend-summary {
+    justify-content: space-between;
+  }
+
   .traditional-stat-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1857,6 +1984,20 @@ button:disabled {
 
   .metric-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .course-insight-summary,
+  .trouble-hole-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trouble-hole {
+    border-right: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .trouble-hole:first-child {
+    border-top: 0;
   }
 
   .live-category-grid {

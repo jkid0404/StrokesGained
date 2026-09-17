@@ -41,6 +41,126 @@ export interface TraditionalStats {
   parScoring: Record<3 | 4 | 5, ParScoringMetric>
 }
 
+export type TraditionalTrendMetric =
+  | 'score-per-18'
+  | 'score-to-par-per-18'
+  | 'fairways'
+  | 'gir'
+  | 'putts-per-18'
+  | 'putts-per-gir'
+  | 'scrambling'
+  | 'up-and-downs'
+  | 'sand-saves'
+  | 'penalties-per-18'
+  | 'one-putts'
+  | 'three-putts'
+  | 'approach-proximity'
+
+export interface TraditionalTrendMetricDefinition {
+  label: string
+  detail: string
+  group: 'Scoring' | 'Driving' | 'Approach' | 'Short game' | 'Putting'
+  higherIsBetter: boolean
+  format: (value: number) => string
+}
+
+export const TRADITIONAL_TREND_METRICS: Record<
+  TraditionalTrendMetric,
+  TraditionalTrendMetricDefinition
+> = {
+  'score-per-18': {
+    label: 'Scoring average',
+    detail: 'Score per 18',
+    group: 'Scoring',
+    higherIsBetter: false,
+    format: (value) => value.toFixed(1),
+  },
+  'score-to-par-per-18': {
+    label: 'Score to par',
+    detail: 'To par per 18',
+    group: 'Scoring',
+    higherIsBetter: false,
+    format: formatSigned,
+  },
+  fairways: {
+    label: 'Fairways hit',
+    detail: 'Fairways hit percentage',
+    group: 'Driving',
+    higherIsBetter: true,
+    format: formatPercent,
+  },
+  gir: {
+    label: 'Greens in regulation',
+    detail: 'GIR percentage',
+    group: 'Approach',
+    higherIsBetter: true,
+    format: formatPercent,
+  },
+  'putts-per-18': {
+    label: 'Putting volume',
+    detail: 'Putts per 18',
+    group: 'Putting',
+    higherIsBetter: false,
+    format: (value) => value.toFixed(1),
+  },
+  'putts-per-gir': {
+    label: 'Putts per GIR',
+    detail: 'Putts on GIR holes',
+    group: 'Putting',
+    higherIsBetter: false,
+    format: (value) => value.toFixed(2),
+  },
+  scrambling: {
+    label: 'Scrambling',
+    detail: 'Scrambling percentage',
+    group: 'Short game',
+    higherIsBetter: true,
+    format: formatPercent,
+  },
+  'up-and-downs': {
+    label: 'Up and downs',
+    detail: 'Up-and-down percentage',
+    group: 'Short game',
+    higherIsBetter: true,
+    format: formatPercent,
+  },
+  'sand-saves': {
+    label: 'Sand saves',
+    detail: 'Estimated greenside sand-save percentage',
+    group: 'Short game',
+    higherIsBetter: true,
+    format: formatPercent,
+  },
+  'penalties-per-18': {
+    label: 'Penalty strokes',
+    detail: 'Penalty strokes per 18',
+    group: 'Scoring',
+    higherIsBetter: false,
+    format: (value) => value.toFixed(1),
+  },
+  'one-putts': {
+    label: 'One-putt holes',
+    detail: 'One-putt percentage',
+    group: 'Putting',
+    higherIsBetter: true,
+    format: formatPercent,
+  },
+  'three-putts': {
+    label: 'Three-putt holes',
+    detail: 'Three-putt percentage',
+    group: 'Putting',
+    higherIsBetter: false,
+    format: formatPercent,
+  },
+  'approach-proximity': {
+    label: 'Approach proximity',
+    detail: 'Average proximity in feet',
+    group: 'Approach',
+    higherIsBetter: false,
+    format: (value) => `${value.toFixed(1)} ft`,
+  },
+}
+
 interface HoleStats {
   score: number
   putts: number
@@ -81,6 +201,7 @@ export function calculateTraditionalStats(rounds: Round[]): TraditionalStats {
       5: { holes: 0, strokes: 0, average: null },
     },
   }
+
   let totalApproachProximity = 0
 
   for (const round of rounds) {
@@ -188,6 +309,59 @@ export function calculateTraditionalStats(rounds: Round[]): TraditionalStats {
   return stats
 }
 
+export function traditionalTrendValue(
+  round: Round,
+  metric: TraditionalTrendMetric,
+): number | null {
+  return traditionalMetricValue(calculateTraditionalStats([round]), metric)
+}
+
+export function traditionalTrendReference(
+  rounds: Round[],
+  metric: TraditionalTrendMetric,
+): number | null {
+  return traditionalMetricValue(calculateTraditionalStats(rounds), metric)
+}
+
+function traditionalMetricValue(
+  stats: TraditionalStats,
+  metric: TraditionalTrendMetric,
+): number | null {
+  if (stats.holesPlayed === 0) return null
+  const per18 = (value: number) => (value / stats.holesPlayed) * 18
+  const percentage = (value: CountMetric) =>
+    value.opportunities > 0 ? (value.made / value.opportunities) * 100 : null
+
+  switch (metric) {
+    case 'score-per-18':
+      return per18(stats.totalStrokes)
+    case 'score-to-par-per-18':
+      return per18(stats.scoreToPar)
+    case 'fairways':
+      return percentage(stats.fairways)
+    case 'gir':
+      return percentage(stats.greensInRegulation)
+    case 'putts-per-18':
+      return per18(stats.putts)
+    case 'putts-per-gir':
+      return stats.puttsPerGreenInRegulation
+    case 'scrambling':
+      return percentage(stats.scrambling)
+    case 'up-and-downs':
+      return percentage(stats.upAndDowns)
+    case 'sand-saves':
+      return percentage(stats.sandSaves)
+    case 'penalties-per-18':
+      return per18(stats.penaltyStrokes)
+    case 'one-putts':
+      return (stats.onePutts / stats.holesPlayed) * 100
+    case 'three-putts':
+      return (stats.threePutts / stats.holesPlayed) * 100
+    case 'approach-proximity':
+      return stats.approachProximityFeet
+  }
+}
+
 function calculateCompletedHole(hole: Hole): HoleStats | null {
   if (hole.shots.at(-1)?.finish.lie !== 'holed') return null
 
@@ -220,4 +394,13 @@ function strokesFrom(hole: Hole, shotIndex: number): number {
   return hole.shots
     .slice(shotIndex)
     .reduce((sum, shot) => sum + 1 + shot.penaltyStrokes, 0)
+}
+
+function formatPercent(value: number): string {
+  return `${value.toFixed(0)}%`
+}
+
+function formatSigned(value: number): string {
+  if (Math.abs(value) < 0.05) return 'E'
+  return value > 0 ? `+${value.toFixed(1)}` : value.toFixed(1)
 }

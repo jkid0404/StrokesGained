@@ -190,6 +190,10 @@ function isCourse(value: unknown): boolean {
     isShortString(value.key, 1_000) &&
     isShortString(value.name, 500) &&
     isShortString(value.teeName, 500) &&
+    (value.aliases === undefined ||
+      (Array.isArray(value.aliases) &&
+        value.aliases.length <= 100 &&
+        value.aliases.every((alias) => isShortString(alias, 1_000)))) &&
     holes.length <= 18 &&
     holes.every(([number, hole]) => {
       if (!/^(?:[1-9]|1[0-8])$/.test(number) || !isRecord(hole)) return false

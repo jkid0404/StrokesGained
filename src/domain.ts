@@ -56,6 +56,7 @@ export interface CourseTemplate {
   name: string
   teeName: string
   holes: Record<number, Pick<Hole, 'par' | 'yardage'>>
+  aliases?: string[]
 }
 
 export function courseKey(name: string, teeName = 'Unspecified tees'): string {

@@ -43,6 +43,7 @@ import { Trends } from './Trends'
 import { updateShotInHole } from './shotEditing'
 import { calculateTraditionalStats } from './traditionalStats'
 import { TraditionalStatsPanel } from './TraditionalStatsPanel'
+import { CourseInsightsPage } from './CourseInsightsPage'
 
 type View =
   | 'home'
@@ -53,6 +54,7 @@ type View =
   | 'trends'
   | 'courses'
   | 'course-edit'
+  | 'course-insights'
   | 'bag'
 
 const CATEGORY_LABELS: Record<ShotCategory, string> = {
@@ -130,7 +132,8 @@ function App() {
   const roundsSelected =
     view === 'home' || view === 'entry' || view === 'review' || view === 'results'
   const trendsSelected = view === 'trends'
-  const coursesSelected = view === 'courses' || view === 'course-edit'
+  const coursesSelected =
+    view === 'courses' || view === 'course-edit' || view === 'course-insights'
 
   function upsertRound(round: Round) {
     setRounds((current) => {
@@ -170,6 +173,7 @@ function App() {
         key,
         name: existing?.name ?? courseName,
         teeName: existing?.teeName ?? teeName,
+        ...(existing?.aliases?.length ? { aliases: existing.aliases } : {}),
         holes: {
           ...(existing?.holes ?? {}),
           [hole.number]: { par: hole.par, yardage: hole.yardage },
@@ -182,11 +186,28 @@ function App() {
   }
 
   function saveCourse(course: CourseTemplate, originalKey: string) {
-    setCourses((current) =>
-      [...current.filter((item) => item.key !== originalKey && item.key !== course.key), course].sort(
-        (a, b) => a.name.localeCompare(b.name),
-      ),
-    )
+    setCourses((current) => {
+      const original = current.find((item) => item.key === originalKey)
+      const aliases =
+        course.key === originalKey
+          ? original?.aliases
+          : [
+              ...new Set([
+                ...(original?.aliases ?? []),
+                originalKey,
+              ]),
+            ].slice(-100)
+      const savedCourse = {
+        ...course,
+        ...(aliases?.length ? { aliases } : {}),
+      }
+      return [
+        ...current.filter(
+          (item) => item.key !== originalKey && item.key !== course.key,
+        ),
+        savedCourse,
+      ].sort((a, b) => a.name.localeCompare(b.name))
+    })
     setDeletedCourseKeys((keys) => [
       ...keys.filter((key) => key !== course.key && key !== originalKey),
       ...(course.key === originalKey ? [] : [originalKey]),
@@ -381,6 +402,10 @@ function App() {
             courses={courses}
             onBack={() => setView('home')}
             onDelete={deleteCourse}
+            onInsights={(course) => {
+              setActiveCourseKey(course.key)
+              setView('course-insights')
+            }}
             onEdit={(course) => {
               setActiveCourseKey(course.key)
               setView('course-edit')
@@ -392,6 +417,13 @@ function App() {
             clubs={clubs}
             onBack={() => setView('home')}
             onChange={setClubs}
+          />
+        )}
+        {view === 'course-insights' && activeCourseKey && (
+          <CourseInsightsPage
+            course={courses.find((course) => course.key === activeCourseKey)}
+            rounds={rounds}
+            onBack={() => setView('courses')}
           />
         )}
         {view === 'course-edit' && activeCourseKey && (
@@ -1383,11 +1415,13 @@ function CourseLibrary({
   onBack,
   onDelete,
   onEdit,
+  onInsights,
 }: {
   courses: CourseTemplate[]
   onBack: () => void
   onDelete: (course: CourseTemplate) => void
   onEdit: (course: CourseTemplate) => void
+  onInsights: (course: CourseTemplate) => void
 }) {
   return (
     <section className="page narrow">
@@ -1419,6 +1453,13 @@ function CourseLibrary({
               <div className="course-row-actions">
                 <button className="danger-button" type="button" onClick={() => onDelete(course)}>
                   Delete
+                </button>
+                <button
+                  className="secondary"
+                  type="button"
+                  onClick={() => onInsights(course)}
+                >
+                  View insights
                 </button>
                 <button className="secondary" type="button" onClick={() => onEdit(course)}>
                   Edit course

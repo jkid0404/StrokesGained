@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { BENCHMARK_VERSION, type Hole, type Round, type Shot } from './domain'
-import { calculateTraditionalStats } from './traditionalStats'
+import {
+  calculateTraditionalStats,
+  traditionalTrendReference,
+  traditionalTrendValue,
+} from './traditionalStats'
 
 describe('traditional golf statistics', () => {
   it('derives scoring, fairways, GIR, putting, and proximity', () => {
@@ -101,6 +105,38 @@ describe('traditional golf statistics', () => {
     expect(stats.puttsPerGreenInRegulation).toBeNull()
     expect(stats.approachProximityFeet).toBeNull()
     expect(stats.parScoring[3].average).toBeNull()
+  })
+
+  it('normalizes count trends to 18 holes and pools percentage references', () => {
+    const nineHoleRound = makeRound([
+      hole(1, 4, [
+        shot('tee', 400, 'fairway', 150),
+        shot('fairway', 150, 'green', 12),
+        shot('green', 12, 'holed', 0),
+      ]),
+    ])
+    const missedFairwayRound = makeRound([
+      hole(1, 4, [
+        shot('tee', 400, 'rough', 150),
+        shot('rough', 150, 'green', 12),
+        shot('green', 12, 'holed', 0),
+      ]),
+      hole(2, 4, [
+        shot('tee', 400, 'rough', 150),
+        shot('rough', 150, 'green', 12),
+        shot('green', 12, 'holed', 0),
+      ]),
+    ])
+
+    expect(traditionalTrendValue(nineHoleRound, 'score-per-18')).toBe(54)
+    expect(traditionalTrendValue(nineHoleRound, 'fairways')).toBe(100)
+    expect(
+      traditionalTrendReference(
+        [nineHoleRound, missedFairwayRound],
+        'fairways',
+      ),
+    ).toBeCloseTo(100 / 3)
+    expect(traditionalTrendValue(nineHoleRound, 'sand-saves')).toBeNull()
   })
 })
 

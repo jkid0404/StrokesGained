@@ -14,7 +14,13 @@ import {
   type Round,
   type ShotCategory,
 } from './domain'
-import { calculateTraditionalStats } from './traditionalStats'
+import {
+  calculateTraditionalStats,
+  traditionalTrendReference,
+  traditionalTrendValue,
+  TRADITIONAL_TREND_METRICS,
+  type TraditionalTrendMetric,
+} from './traditionalStats'
 import { TraditionalStatsPanel } from './TraditionalStatsPanel'
 
 const CATEGORY_LABELS: Record<ShotCategory, string> = {
@@ -25,6 +31,13 @@ const CATEGORY_LABELS: Record<ShotCategory, string> = {
 }
 
 const WINDOW_OPTIONS = [5, 10, 20] as const
+const TRADITIONAL_METRIC_GROUPS = [
+  'Scoring',
+  'Driving',
+  'Approach',
+  'Short game',
+  'Putting',
+] as const
 
 export function Trends({
   clubs,
@@ -40,6 +53,8 @@ export function Trends({
   const [toDate, setToDate] = useState('')
   const [roundLength, setRoundLength] = useState<RoundLengthFilter>('all')
   const [category, setCategory] = useState<TrendCategory>('total')
+  const [traditionalMetric, setTraditionalMetric] =
+    useState<TraditionalTrendMetric>('score-to-par-per-18')
 
   const completedRounds = useMemo(
     () => rounds.filter((round) => round.status === 'complete'),
@@ -78,6 +93,27 @@ export function Trends({
   const splits = buildCourseSplits(displayedRounds, category)
   const clubMetrics = buildClubAnalytics(displayedRounds, category, clubs)
   const traditionalStats = calculateTraditionalStats(displayedRounds)
+  const traditionalDefinition = TRADITIONAL_TREND_METRICS[traditionalMetric]
+  const traditionalPoints = displayedRounds.map((round) => ({
+    round,
+    value: traditionalTrendValue(round, traditionalMetric),
+  }))
+  const traditionalReference = traditionalTrendReference(
+    filteredRounds,
+    traditionalMetric,
+  )
+  const traditionalWindowAverage = traditionalTrendReference(
+    displayedRounds,
+    traditionalMetric,
+  )
+  const traditionalValues = traditionalPoints.flatMap((point) =>
+    point.value === null ? [] : [point.value],
+  )
+  const traditionalBest = traditionalValues.length
+    ? traditionalDefinition.higherIsBetter
+      ? Math.max(...traditionalValues)
+      : Math.min(...traditionalValues)
+    : null
   const values = points.flatMap((point) => (point.value === null ? [] : [point.value]))
   const average = values.length
     ? values.reduce((sum, value) => sum + value, 0) / values.length
@@ -224,6 +260,69 @@ export function Trends({
             stats={traditionalStats}
           />
 
+          <div className="card traditional-trend-controls">
+            <label>
+              Traditional-stat chart
+              <select
+                value={traditionalMetric}
+                onChange={(event) =>
+                  setTraditionalMetric(
+                    event.target.value as TraditionalTrendMetric,
+                  )
+                }
+              >
+                {TRADITIONAL_METRIC_GROUPS.map((group) => (
+                  <optgroup label={group} key={group}>
+                    {(
+                      Object.entries(TRADITIONAL_TREND_METRICS) as Array<
+                        [
+                          TraditionalTrendMetric,
+                          (typeof TRADITIONAL_TREND_METRICS)[TraditionalTrendMetric],
+                        ]
+                      >
+                    )
+                      .filter(([, definition]) => definition.group === group)
+                      .map(([key, definition]) => (
+                        <option value={key} key={key}>
+                          {definition.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            <div className="traditional-trend-summary">
+              <TraditionalTrendSummary
+                format={traditionalDefinition.format}
+                label="Window average"
+                value={traditionalWindowAverage}
+              />
+              <TraditionalTrendSummary
+                format={traditionalDefinition.format}
+                label="Best round"
+                value={traditionalBest}
+              />
+            </div>
+          </div>
+
+          <TrendChart
+            emptyMessage="The selected rounds do not contain opportunities for this traditional statistic."
+            formatValue={traditionalDefinition.format}
+            label={traditionalDefinition.label}
+            metricDetail={traditionalDefinition.detail}
+            personalReference={traditionalReference}
+            personalReferenceLabel="Filtered average"
+            pointClass={(value) => {
+              if (traditionalReference === null) return 'neutral'
+              const isBetter = traditionalDefinition.higherIsBetter
+                ? value >= traditionalReference
+                : value <= traditionalReference
+              return isBetter ? 'positive' : 'negative'
+            }}
+            points={traditionalPoints}
+            showPgaReference={false}
+          />
+
           <div className="card course-splits-card">
             <div className="section-heading compact-heading">
               <div>
@@ -338,6 +437,23 @@ export function Trends({
   )
 }
 
+function TraditionalTrendSummary({
+  format,
+  label,
+  value,
+}: {
+  format: (value: number) => string
+  label: string
+  value: number | null
+}) {
+  return (
+    <span>
+      <small>{label}</small>
+      <strong>{value === null ? 'N/A' : format(value)}</strong>
+    </span>
+  )
+}
+
 function TrendMetric({
   label,
   value,
@@ -363,15 +479,25 @@ function TrendMetric({
 }
 
 function TrendChart({
+  emptyMessage = 'These rounds do not contain supported shots for the selected metric.',
+  formatValue = formatMetric,
   label,
   metricDetail,
   personalReference,
+  personalReferenceLabel = 'Your average',
+  pointClass = (value) => (value >= 0 ? 'positive' : 'negative'),
   points,
+  showPgaReference = true,
 }: {
+  emptyMessage?: string
+  formatValue?: (value: number) => string
   label: string
   metricDetail: string
   personalReference: number | null
+  personalReferenceLabel?: string
+  pointClass?: (value: number) => 'positive' | 'negative' | 'neutral'
   points: TrendPoint[]
+  showPgaReference?: boolean
 }) {
   const width = 840
   const height = 330
@@ -391,16 +517,14 @@ function TrendChart({
             <h2>No supported values</h2>
           </div>
         </div>
-        <p className="muted">
-          These rounds do not contain supported shots for the selected metric.
-        </p>
+        <p className="muted">{emptyMessage}</p>
       </div>
     )
   }
 
   const scaleValues = [
     ...availableValues,
-    0,
+    ...(showPgaReference ? [0] : []),
     ...(personalReference === null ? [] : [personalReference]),
   ]
   const rawMin = Math.min(...scaleValues)
@@ -428,9 +552,13 @@ function TrendChart({
         </div>
         <div className="trend-legend" aria-label="Chart reference lines">
           <span className="trend-legend-series">Round</span>
-          <span className="trend-legend-pga">PGA Tour</span>
+          {showPgaReference && (
+            <span className="trend-legend-pga">PGA Tour</span>
+          )}
           {personalReference !== null && (
-            <span className="trend-legend-personal">Your average</span>
+            <span className="trend-legend-personal">
+              {personalReferenceLabel}
+            </span>
           )}
         </div>
       </div>
@@ -454,18 +582,20 @@ function TrendChart({
                 y2={y(tick)}
               />
               <text className="trend-axis-label" x={margin.left - 10} y={y(tick) + 4}>
-                {tick.toFixed(1)}
+                {formatValue(tick)}
               </text>
             </g>
           ))}
 
-          <line
-            className="trend-reference-line pga"
-            x1={margin.left}
-            x2={width - margin.right}
-            y1={y(0)}
-            y2={y(0)}
-          />
+          {showPgaReference && (
+            <line
+              className="trend-reference-line pga"
+              x1={margin.left}
+              x2={width - margin.right}
+              y1={y(0)}
+              y2={y(0)}
+            />
+          )}
           {personalReference !== null && (
             <line
               className="trend-reference-line personal"
@@ -484,13 +614,14 @@ function TrendChart({
             <g key={point.round.id}>
               {point.value !== null && (
                 <circle
-                  className={point.value >= 0 ? 'trend-point positive' : 'trend-point negative'}
+                  className={`trend-point ${pointClass(point.value)}`}
                   cx={x(index)}
                   cy={y(point.value)}
                   r="5"
                 >
                   <title>
-                    {point.round.courseName}, {point.round.playedOn}: {formatMetric(point.value)}
+                    {point.round.courseName}, {point.round.playedOn}:{' '}
+                    {formatValue(point.value)}
                   </title>
                 </circle>
               )}

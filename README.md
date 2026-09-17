@@ -17,8 +17,11 @@ records.
 Round results and filtered Trends also include traditional statistics such as
 fairways, greens in regulation, putting, scrambling, up-and-downs, estimated
 greenside sand saves, approach proximity, penalties, scoring distribution, and
-scoring averages by par. Completed rounds pass through a final scorecard review,
-and individual shots can be edited without discarding the later shot history.
+scoring averages by par. Selectable traditional-stat charts use the same
+5/10/20-round, course, tee, date, and round-length filters. Saved courses also
+provide course-wide and hole-by-hole insights, including recurring trouble
+holes. Completed rounds pass through a final scorecard review, and individual
+shots can be edited without discarding the later shot history.
 
 When hosted on Azure Static Web Apps, the app adds private cross-device sync:
 
