@@ -28,8 +28,14 @@ describe('trend analytics', () => {
     expect(summary.supportedRounds).toBe(2)
     expect(summary.totalPer18).not.toBeNull()
     expect(summary.categories['off-the-tee'].shots).toBe(18)
-    expect(summary.categories['off-the-tee'].perShot).not.toBeNull()
-    expect(summary.categories.putting).toEqual({ perShot: null, shots: 0 })
+    expect(summary.categories['off-the-tee'].per18).not.toBeNull()
+    expect(summary.categories.putting).toEqual({ per18: 0, shots: 0 })
+    expect(
+      Object.values(summary.categories).reduce(
+        (total, category) => total + (category.per18 ?? 0),
+        0,
+      ),
+    ).toBeCloseTo(summary.totalPer18!)
   })
 
   it('filters completed rounds by course, tee, date, and round length', () => {

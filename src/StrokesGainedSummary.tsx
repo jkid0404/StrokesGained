@@ -36,10 +36,10 @@ export function StrokesGainedSummary({
           <StrokesGainedMetric
             detail={`${summary.categories[category].shots} shot${
               summary.categories[category].shots === 1 ? '' : 's'
-            } · SG per shot`}
+            } · SG per 18`}
             key={category}
             label={CATEGORY_LABELS[category]}
-            value={summary.categories[category].perShot}
+            value={summary.categories[category].per18}
           />
         ))}
       </div>

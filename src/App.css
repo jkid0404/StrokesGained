@@ -39,6 +39,24 @@
   margin-top: 3px;
 }
 
+.club-analytics-row > :first-child {
+  background: var(--white);
+  box-shadow:
+    14px 0 0 var(--white),
+    20px 0 14px -16px rgba(21, 37, 29, 0.45);
+  left: 0;
+  position: sticky;
+  z-index: 1;
+}
+
+.club-analytics-row.table-header > :first-child {
+  background: #f5f7f4;
+  box-shadow:
+    14px 0 0 #f5f7f4,
+    20px 0 14px -16px rgba(21, 37, 29, 0.45);
+  z-index: 2;
+}
+
 * {
   box-sizing: border-box;
 }

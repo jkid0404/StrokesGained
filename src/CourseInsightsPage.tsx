@@ -118,10 +118,10 @@ export function CourseInsightsPage({
                   <span>Avg score</span>
                   <span>To par</span>
                   <span>Avg SG</span>
-                  <span>SG/shot: Tee</span>
-                  <span>SG/shot: Approach</span>
-                  <span>SG/shot: Short</span>
-                  <span>SG/shot: Putting</span>
+                  <span>SG: Tee</span>
+                  <span>SG: Approach</span>
+                  <span>SG: Short</span>
+                  <span>SG: Putting</span>
                   <span>Fairway</span>
                   <span>GIR</span>
                   <span>Putts</span>

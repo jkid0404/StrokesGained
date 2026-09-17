@@ -70,6 +70,12 @@ describe('course and hole insights', () => {
     ).not.toBeNull()
     expect(insights.holes[0].strokesGainedCategories.approach).not.toBeNull()
     expect(insights.holes[0].strokesGainedCategories.putting).not.toBeNull()
+    expect(
+      Object.values(insights.holes[0].strokesGainedCategories).reduce<number>(
+        (total, value) => total + (value ?? 0),
+        0,
+      ),
+    ).toBeCloseTo(insights.holes[0].averageStrokesGained!)
   })
 
   it('returns empty insight values when a course has no completed rounds', () => {

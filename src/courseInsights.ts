@@ -52,7 +52,6 @@ interface HoleAccumulator {
   scoreToPar: number[]
   strokesGained: number[]
   strokesGainedCategoryTotals: Record<ShotCategory, number>
-  strokesGainedCategoryShots: Record<ShotCategory, number>
   fairways: CountMetric
   greensInRegulation: CountMetric
   putts: number
@@ -87,7 +86,6 @@ export function buildCourseInsights(
         scoreToPar: [],
         strokesGained: [],
         strokesGainedCategoryTotals: categoryRecord(0),
-        strokesGainedCategoryShots: categoryRecord(0),
         fairways: { made: 0, opportunities: 0 },
         greensInRegulation: { made: 0, opportunities: 0 },
         putts: 0,
@@ -105,8 +103,6 @@ export function buildCourseInsights(
         ) as ShotCategory[]) {
           group.strokesGainedCategoryTotals[category] +=
             strokesGained.categories[category].total
-          group.strokesGainedCategoryShots[category] +=
-            strokesGained.categories[category].shots
         }
       }
       addCountMetric(group.fairways, stats.fairways)
@@ -177,9 +173,9 @@ function toHoleInsight(group: HoleAccumulator): CourseHoleInsight {
       (Object.keys(group.strokesGainedCategoryTotals) as ShotCategory[]).map(
         (category) => [
           category,
-          group.strokesGainedCategoryShots[category]
+          group.strokesGained.length
             ? group.strokesGainedCategoryTotals[category] /
-              group.strokesGainedCategoryShots[category]
+              group.strokesGained.length
             : null,
         ],
       ),

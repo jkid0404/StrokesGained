@@ -29,7 +29,7 @@ export interface StrokesGainedSummary {
   categories: Record<
     ShotCategory,
     {
-      perShot: number | null
+      per18: number | null
       shots: number
     }
   >
@@ -102,13 +102,16 @@ export function personalTrendReference(
 export function buildStrokesGainedSummary(
   rounds: Round[],
 ): StrokesGainedSummary {
-  const categorySeed = () => ({ total: 0, shots: 0 })
+  const categorySeed = () => ({ per18Total: 0, shots: 0 })
   const categories = {
     'off-the-tee': categorySeed(),
     approach: categorySeed(),
     'around-the-green': categorySeed(),
     putting: categorySeed(),
-  } satisfies Record<ShotCategory, { total: number; shots: number }>
+  } satisfies Record<
+    ShotCategory,
+    { per18Total: number; shots: number }
+  >
   const totalPer18: number[] = []
 
   for (const round of rounds) {
@@ -125,7 +128,8 @@ export function buildStrokesGainedSummary(
       (metrics.totalStrokesGained / metrics.completedHoles) * 18,
     )
     for (const category of Object.keys(categories) as ShotCategory[]) {
-      categories[category].total += metrics.categories[category].total
+      categories[category].per18Total +=
+        (metrics.categories[category].total / metrics.completedHoles) * 18
       categories[category].shots += metrics.categories[category].shots
     }
   }
@@ -137,8 +141,8 @@ export function buildStrokesGainedSummary(
       (Object.keys(categories) as ShotCategory[]).map((category) => [
         category,
         {
-          perShot: categories[category].shots
-            ? categories[category].total / categories[category].shots
+          per18: totalPer18.length
+            ? categories[category].per18Total / totalPer18.length
             : null,
           shots: categories[category].shots,
         },
