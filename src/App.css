@@ -1179,6 +1179,122 @@ textarea:focus {
   margin-right: auto;
 }
 
+.course-heading-actions,
+.proposal-actions,
+.proposal-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.course-proposal-list {
+  display: grid;
+  gap: 18px;
+}
+
+.course-proposal-card {
+  overflow: hidden;
+}
+
+.course-proposal-card > .section-heading {
+  padding: 0 22px;
+}
+
+.proposal-meta,
+.proposal-message,
+.proposal-review-note,
+.proposal-actions {
+  margin: 0;
+  padding: 14px 22px;
+}
+
+.proposal-meta {
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.proposal-message,
+.proposal-review-note {
+  border-top: 1px solid var(--line);
+}
+
+.proposal-review-note strong,
+.proposal-review-note span {
+  display: block;
+}
+
+.proposal-review-note span {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.proposal-diff {
+  border-top: 1px solid var(--line);
+}
+
+.proposal-identity-change {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr auto 1fr;
+  padding: 16px 22px;
+}
+
+.proposal-hole-table {
+  border-top: 1px solid var(--line);
+}
+
+.proposal-hole-row {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 70px 1fr 1fr;
+  padding: 12px 22px;
+}
+
+.proposal-hole-row:first-child {
+  border-top: 0;
+}
+
+.proposal-diff > .muted {
+  padding: 0 22px 16px;
+}
+
+.proposal-actions {
+  border-top: 1px solid var(--line);
+  justify-content: flex-end;
+}
+
+.proposal-message-field {
+  margin-top: 18px;
+}
+
+.proposal-message-field label,
+.proposal-message-field textarea {
+  display: block;
+  width: 100%;
+}
+
+.proposal-pending,
+.proposal-changes-requested {
+  background: #fff6dc;
+  color: #765b12;
+}
+
+.proposal-approved {
+  background: var(--green-soft);
+  color: var(--green-dark);
+}
+
+.proposal-rejected,
+.proposal-withdrawn {
+  background: #f2f2ef;
+  color: var(--muted);
+}
+
 .course-insight-summary {
   display: grid;
   gap: 14px;
@@ -2052,6 +2168,11 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .course-heading-actions {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+
   .trouble-hole {
     border-right: 0;
     border-top: 1px solid var(--line);
@@ -2146,6 +2267,19 @@ button:disabled {
   .trend-filter-grid,
   .trend-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .proposal-identity-change {
+    align-items: flex-start;
+    grid-template-columns: 1fr;
+  }
+
+  .proposal-hole-table {
+    overflow-x: auto;
+  }
+
+  .proposal-hole-row {
+    min-width: 520px;
   }
 
   .traditional-breakdown-grid {

@@ -37,6 +37,9 @@ When hosted on Azure Static Web Apps, the app adds private cross-device sync:
 - A separate shared Cosmos course catalog. All invited golfers can read shared
   scorecards, while only administrators can change them. Rounds, shots, trends,
   and course insights remain private to each owner.
+- A moderated course-publication queue. Golfers can submit personal courses or
+  suggest edits to shared scorecards; administrators review the course diff
+  before approval changes the shared catalog.
 - Revision-based optimistic concurrency. Conflicts are shown in the UI and are
   never silently overwritten.
 
@@ -106,6 +109,12 @@ container. The shared catalog is cached per account for offline use and uses its
 own revision-based conflict protection. Personal course templates remain
 available for ad-hoc rounds; matching shared definitions take precedence.
 
+Course submissions are stored in the `courseProposals` container partitioned by
+the server-derived proposer ID. Golfers can list and withdraw their own pending
+submissions. Administrators can review all submissions, approve them into the
+shared catalog, reject them, or request changes. Approval verifies that the
+target shared course has not changed since the proposal was submitted.
+
 ## Azure deployment
 
 `infra/main.bicep` creates a serverless Cosmos DB account/database/container and
@@ -127,6 +136,7 @@ without returning the Cosmos credential to the caller:
 - `COSMOS_DATABASE_NAME`
 - `COSMOS_CONTAINER_NAME`
 - `COSMOS_COURSES_CONTAINER_NAME`
+- `COSMOS_PROPOSALS_CONTAINER_NAME`
 - `ADMIN_USER_EMAIL`
 
 The script then prints the command for retrieving the Static Web Apps deployment
