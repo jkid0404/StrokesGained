@@ -47,6 +47,8 @@ import { TraditionalStatsPanel } from './TraditionalStatsPanel'
 import { CourseInsightsPage } from './CourseInsightsPage'
 import { useSharedCourses } from './useSharedCourses'
 import { mergeSharedCourses } from './sharedCourses'
+import { submitCourseProposal } from './courseProposals'
+import { CourseSubmissionsPage } from './CourseSubmissionsPage'
 
 type View =
   | 'home'
@@ -58,6 +60,8 @@ type View =
   | 'courses'
   | 'course-edit'
   | 'course-insights'
+  | 'course-proposal'
+  | 'course-submissions'
   | 'bag'
 
 const CATEGORY_LABELS: Record<ShotCategory, string> = {
@@ -109,6 +113,13 @@ function App() {
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null)
   const [activeHoleIndex, setActiveHoleIndex] = useState(0)
   const [activeCourseKey, setActiveCourseKey] = useState<string | null>(null)
+  const [proposalTargetCourseKey, setProposalTargetCourseKey] = useState<
+    string | null
+  >(null)
+  const [proposalBaseCatalogRevision, setProposalBaseCatalogRevision] =
+    useState(0)
+  const [proposalBaseCourse, setProposalBaseCourse] =
+    useState<CourseTemplate | null>(null)
 
   const applyCloudState = useCallback((state: LocalState) => {
     setRounds(state.rounds)
@@ -180,7 +191,11 @@ function App() {
     view === 'home' || view === 'entry' || view === 'review' || view === 'results'
   const trendsSelected = view === 'trends'
   const coursesSelected =
-    view === 'courses' || view === 'course-edit' || view === 'course-insights'
+    view === 'courses' ||
+    view === 'course-edit' ||
+    view === 'course-insights' ||
+    view === 'course-proposal' ||
+    view === 'course-submissions'
 
   function upsertRound(round: Round) {
     setRounds((current) => {
@@ -490,8 +505,11 @@ function App() {
             courses={courses}
             sharedCourseKeys={sharedCourseCatalog.map((course) => course.key)}
             onReloadSharedCourses={sharedCourses.reloadServerCatalog}
+            onOpenSubmissions={() => setView('course-submissions')}
             sharedConflict={sharedCourses.status === 'conflict'}
             sharedStatus={sharedCourses.message}
+            submissionsEnabled={cloud.authMode === 'signed-in'}
+            isAdmin={cloud.isAdmin}
             onBack={() => setView('home')}
             onDelete={deleteCourse}
             onInsights={(course) => {
@@ -501,6 +519,20 @@ function App() {
             onEdit={(course) => {
               setActiveCourseKey(course.key)
               setView('course-edit')
+            }}
+            onSubmit={(course) => {
+              setActiveCourseKey(course.key)
+              setProposalTargetCourseKey(null)
+              setProposalBaseCatalogRevision(sharedCourses.revision)
+              setProposalBaseCourse(null)
+              setView('course-proposal')
+            }}
+            onSuggest={(course) => {
+              setActiveCourseKey(course.key)
+              setProposalTargetCourseKey(course.key)
+              setProposalBaseCatalogRevision(sharedCourses.revision)
+              setProposalBaseCourse(course)
+              setView('course-proposal')
             }}
             onShare={shareCourse}
           />
@@ -524,6 +556,30 @@ function App() {
             course={courses.find((course) => course.key === activeCourseKey)}
             onCancel={() => setView('courses')}
             onSave={(course) => saveCourse(course, activeCourseKey)}
+          />
+        )}
+        {view === 'course-proposal' && activeCourseKey && (
+          <CourseEditor
+            course={courses.find((course) => course.key === activeCourseKey)}
+            mode="proposal"
+            onCancel={() => setView('courses')}
+            onSave={async (course, message) => {
+              await submitCourseProposal({
+                targetCourseKey: proposalTargetCourseKey,
+                baseCatalogRevision: proposalBaseCatalogRevision,
+                baseCourse: proposalBaseCourse,
+                proposedCourse: course,
+                message,
+              })
+              setView('course-submissions')
+            }}
+          />
+        )}
+        {view === 'course-submissions' && (
+          <CourseSubmissionsPage
+            isAdmin={cloud.isAdmin}
+            onBack={() => setView('courses')}
+            onCatalogChanged={sharedCourses.refreshCatalog}
           />
         )}
       </main>
@@ -1517,11 +1573,16 @@ function CourseLibrary({
   onDelete,
   onEdit,
   onInsights,
+  onOpenSubmissions,
   onReloadSharedCourses,
   onShare,
+  onSubmit,
+  onSuggest,
+  isAdmin,
   sharedCourseKeys,
   sharedConflict,
   sharedStatus,
+  submissionsEnabled,
 }: {
   canManage: boolean
   courses: CourseTemplate[]
@@ -1529,11 +1590,16 @@ function CourseLibrary({
   onDelete: (course: CourseTemplate) => void
   onEdit: (course: CourseTemplate) => void
   onInsights: (course: CourseTemplate) => void
+  onOpenSubmissions: () => void
   onReloadSharedCourses: () => void
   onShare: (course: CourseTemplate) => void
+  onSubmit: (course: CourseTemplate) => void
+  onSuggest: (course: CourseTemplate) => void
+  isAdmin: boolean
   sharedCourseKeys: string[]
   sharedConflict: boolean
   sharedStatus: string
+  submissionsEnabled: boolean
 }) {
   return (
     <section className="page narrow">
@@ -1545,10 +1611,21 @@ function CourseLibrary({
           <span className="eyebrow">Course scorecards</span>
           <h1 className="page-title">Courses</h1>
         </div>
-        <span className="pill">
-          {canManage ? 'Admin · ' : ''}
-          {courses.length} saved
-        </span>
+        <div className="course-heading-actions">
+          {submissionsEnabled && (
+            <button
+              className="secondary compact"
+              type="button"
+              onClick={onOpenSubmissions}
+            >
+              {isAdmin ? 'Review submissions' : 'My submissions'}
+            </button>
+          )}
+          <span className="pill">
+            {canManage ? 'Admin · ' : ''}
+            {courses.length} saved
+          </span>
+        </div>
       </div>
       <div className="course-catalog-status">
         <p className="muted bag-description">{sharedStatus}</p>
@@ -1588,6 +1665,28 @@ function CourseLibrary({
                     Share course
                   </button>
                 )}
+                {submissionsEnabled &&
+                  !isAdmin &&
+                  !sharedCourseKeys.includes(course.key) && (
+                    <button
+                      className="primary"
+                      type="button"
+                      onClick={() => onSubmit(course)}
+                    >
+                      Submit for publication
+                    </button>
+                  )}
+                {submissionsEnabled &&
+                  !isAdmin &&
+                  sharedCourseKeys.includes(course.key) && (
+                    <button
+                      className="secondary"
+                      type="button"
+                      onClick={() => onSuggest(course)}
+                    >
+                      Suggest edit
+                    </button>
+                  )}
                 {(canManage || !sharedCourseKeys.includes(course.key)) && (
                   <button
                     className="danger-button"
@@ -1951,17 +2050,22 @@ function ShotEditor({
 
 function CourseEditor({
   course,
+  mode = 'edit',
   onCancel,
   onSave,
 }: {
   course?: CourseTemplate
+  mode?: 'edit' | 'proposal'
   onCancel: () => void
-  onSave: (course: CourseTemplate) => void
+  onSave: (course: CourseTemplate, message: string) => void | Promise<void>
 }) {
   const originalName = course?.name ?? ''
   const originalTeeName = course?.teeName ?? 'Unspecified tees'
   const [name, setName] = useState(originalName)
   const [teeName, setTeeName] = useState(originalTeeName)
+  const [message, setMessage] = useState('')
+  const [submitError, setSubmitError] = useState('')
+  const [saving, setSaving] = useState(false)
   const [holes, setHoles] = useState(() =>
     Array.from({ length: 18 }, (_, index) => {
       const saved = course?.holes[index + 1]
@@ -1994,7 +2098,7 @@ function CourseEditor({
     )
   }
 
-  function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent) {
     event.preventDefault()
     const savedHoles: CourseTemplate['holes'] = {}
     for (const hole of holes) {
@@ -2006,12 +2110,25 @@ function CourseEditor({
     }
     const trimmedName = name.trim() || originalName
     const trimmedTeeName = teeName.trim() || 'Unspecified tees'
-    onSave({
-      key: courseKey(trimmedName, trimmedTeeName),
-      name: trimmedName,
-      teeName: trimmedTeeName,
-      holes: savedHoles,
-    })
+    setSaving(true)
+    setSubmitError('')
+    try {
+      await onSave(
+        {
+          key: courseKey(trimmedName, trimmedTeeName),
+          name: trimmedName,
+          teeName: trimmedTeeName,
+          holes: savedHoles,
+        },
+        message.trim(),
+      )
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : 'Unable to save this course.',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -2021,8 +2138,12 @@ function CourseEditor({
       </button>
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Course editor</span>
-          <h1 className="page-title">{course.name}</h1>
+          <span className="eyebrow">
+            {mode === 'proposal' ? 'Course submission' : 'Course editor'}
+          </span>
+          <h1 className="page-title">
+            {mode === 'proposal' ? 'Propose course changes' : course.name}
+          </h1>
         </div>
       </div>
       <form onSubmit={submit}>
@@ -2076,12 +2197,31 @@ function CourseEditor({
             </div>
           ))}
         </div>
+        {mode === 'proposal' && (
+          <div className="card proposal-message-field">
+            <label>
+              Note for the reviewer
+              <textarea
+                maxLength={500}
+                placeholder="Explain the new course or what changed."
+                rows={4}
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+              />
+            </label>
+          </div>
+        )}
+        {submitError && <div className="error-message">{submitError}</div>}
         <div className="actions">
           <button className="secondary" type="button" onClick={onCancel}>
             Cancel
           </button>
-          <button className="primary" type="submit">
-            Save course
+          <button className="primary" disabled={saving} type="submit">
+            {saving
+              ? 'Saving…'
+              : mode === 'proposal'
+                ? 'Submit for review'
+                : 'Save course'}
           </button>
         </div>
       </form>
