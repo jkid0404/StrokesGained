@@ -133,10 +133,7 @@ export function CourseInsightsPage({
                       <strong>{hole.holeNumber}</strong>
                       <small>Par {hole.parLabel}</small>
                     </span>
-                    <span>
-                      {hole.plays}
-                      <small>{hole.established ? 'Established' : 'Provisional'}</small>
-                    </span>
+                    <span>{hole.plays}</span>
                     <strong>{hole.averageScore.toFixed(2)}</strong>
                     <strong
                       className={hole.averageToPar <= 0 ? 'positive' : 'negative'}

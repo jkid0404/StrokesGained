@@ -357,14 +357,6 @@ export function Trends({
                   <div className="club-analytics-row" key={metric.key}>
                     <span>
                       <strong>{metric.club}</strong>
-                      <small>
-                        {metric.distanceBand && `${metric.distanceBand} · `}
-                        {metric.shots === 0
-                          ? 'No shots'
-                          : metric.shots < 5
-                            ? 'Small sample'
-                            : 'Established sample'}
-                      </small>
                     </span>
                     <span>{metric.shots}</span>
                     <span>

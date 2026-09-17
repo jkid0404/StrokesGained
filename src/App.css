@@ -1244,6 +1244,24 @@ textarea:focus {
   display: block;
 }
 
+.course-hole-row > :first-child {
+  background: var(--white);
+  box-shadow:
+    14px 0 0 var(--white),
+    20px 0 14px -16px rgba(21, 37, 29, 0.45);
+  left: 0;
+  position: sticky;
+  z-index: 1;
+}
+
+.course-hole-row.table-header > :first-child {
+  background: #f5f7f4;
+  box-shadow:
+    14px 0 0 #f5f7f4,
+    20px 0 14px -16px rgba(21, 37, 29, 0.45);
+  z-index: 2;
+}
+
 .course-hole-row small {
   color: var(--muted);
   font-size: 11px;
