@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import {
   buildClubAnalytics,
-  buildCourseSplits,
   buildTrendPoints,
   filterTrendRounds,
   personalTrendReference,
@@ -31,6 +30,22 @@ const CATEGORY_LABELS: Record<ShotCategory, string> = {
 }
 
 const WINDOW_OPTIONS = [5, 10, 20] as const
+type TrendMetricSelection =
+  | `sg:${TrendCategory}`
+  | `traditional:${TraditionalTrendMetric}`
+
+const SG_METRICS: Array<{
+  key: TrendMetricSelection
+  label: string
+}> = [
+  { key: 'sg:total', label: 'Total strokes gained' },
+  ...(
+    Object.keys(CATEGORY_LABELS) as ShotCategory[]
+  ).map((category) => ({
+    key: `sg:${category}` as TrendMetricSelection,
+    label: CATEGORY_LABELS[category],
+  })),
+]
 const TRADITIONAL_METRIC_GROUPS = [
   'Scoring',
   'Driving',
@@ -52,9 +67,8 @@ export function Trends({
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [roundLength, setRoundLength] = useState<RoundLengthFilter>('all')
-  const [category, setCategory] = useState<TrendCategory>('total')
-  const [traditionalMetric, setTraditionalMetric] =
-    useState<TraditionalTrendMetric>('score-to-par-per-18')
+  const [selectedMetric, setSelectedMetric] =
+    useState<TrendMetricSelection>('sg:total')
 
   const completedRounds = useMemo(
     () => rounds.filter((round) => round.status === 'complete'),
@@ -88,40 +102,60 @@ export function Trends({
     [courseName, fromDate, roundLength, rounds, teeName, toDate],
   )
   const displayedRounds = filteredRounds.slice(-windowSize)
-  const points = buildTrendPoints(displayedRounds, category)
-  const personalReference = personalTrendReference(filteredRounds, category)
-  const splits = buildCourseSplits(displayedRounds, category)
-  const clubMetrics = buildClubAnalytics(displayedRounds, category, clubs)
   const traditionalStats = calculateTraditionalStats(displayedRounds)
-  const traditionalDefinition = TRADITIONAL_TREND_METRICS[traditionalMetric]
-  const traditionalPoints = displayedRounds.map((round) => ({
-    round,
-    value: traditionalTrendValue(round, traditionalMetric),
-  }))
-  const traditionalReference = traditionalTrendReference(
-    filteredRounds,
-    traditionalMetric,
-  )
-  const traditionalWindowAverage = traditionalTrendReference(
-    displayedRounds,
-    traditionalMetric,
-  )
-  const traditionalValues = traditionalPoints.flatMap((point) =>
+  const isStrokesGained = selectedMetric.startsWith('sg:')
+  const sgCategory = isStrokesGained
+    ? (selectedMetric.slice(3) as TrendCategory)
+    : 'total'
+  const selectedTraditionalMetric = isStrokesGained
+    ? null
+    : (selectedMetric.slice('traditional:'.length) as TraditionalTrendMetric)
+  const traditionalDefinition = selectedTraditionalMetric
+    ? TRADITIONAL_TREND_METRICS[selectedTraditionalMetric]
+    : null
+  const points = isStrokesGained
+    ? buildTrendPoints(displayedRounds, sgCategory)
+    : displayedRounds.map((round) => ({
+        round,
+        value: traditionalTrendValue(round, selectedTraditionalMetric!),
+      }))
+  const reference = isStrokesGained
+    ? personalTrendReference(filteredRounds, sgCategory)
+    : traditionalTrendReference(filteredRounds, selectedTraditionalMetric!)
+  const values = points.flatMap((point) =>
     point.value === null ? [] : [point.value],
   )
-  const traditionalBest = traditionalValues.length
-    ? traditionalDefinition.higherIsBetter
-      ? Math.max(...traditionalValues)
-      : Math.min(...traditionalValues)
+  const higherIsBetter =
+    isStrokesGained || Boolean(traditionalDefinition?.higherIsBetter)
+  const average = isStrokesGained
+    ? values.length
+      ? values.reduce((sum, value) => sum + value, 0) / values.length
+      : null
+    : traditionalTrendReference(displayedRounds, selectedTraditionalMetric!)
+  const best = values.length
+    ? higherIsBetter
+      ? Math.max(...values)
+      : Math.min(...values)
     : null
-  const values = points.flatMap((point) => (point.value === null ? [] : [point.value]))
-  const average = values.length
-    ? values.reduce((sum, value) => sum + value, 0) / values.length
-    : null
-  const best = values.length ? Math.max(...values) : null
-  const metricDetail = category === 'total' ? 'SG per 18' : 'SG per shot'
-  const metricLabel =
-    category === 'total' ? 'Total strokes gained' : CATEGORY_LABELS[category]
+  const metricDetail = isStrokesGained
+    ? sgCategory === 'total'
+      ? 'SG per 18'
+      : 'SG per shot'
+    : traditionalDefinition!.detail
+  const metricLabel = isStrokesGained
+    ? sgCategory === 'total'
+      ? 'Total strokes gained'
+      : CATEGORY_LABELS[sgCategory]
+    : traditionalDefinition!.label
+  const formatValue = isStrokesGained
+    ? formatMetric
+    : traditionalDefinition!.format
+  const clubCategory = isStrokesGained ? sgCategory : 'total'
+  const clubMetrics = buildClubAnalytics(
+    displayedRounds,
+    clubCategory,
+    clubs,
+  )
 
   return (
     <section className="page trends-page">
@@ -208,20 +242,6 @@ export function Trends({
               <option value="18">18 holes</option>
             </select>
           </label>
-          <label>
-            Category
-            <select
-              value={category}
-              onChange={(event) => setCategory(event.target.value as TrendCategory)}
-            >
-              <option value="total">Total SG</option>
-              {(Object.keys(CATEGORY_LABELS) as ShotCategory[]).map((item) => (
-                <option value={item} key={item}>
-                  {CATEGORY_LABELS[item]}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
       </div>
 
@@ -233,24 +253,62 @@ export function Trends({
       ) : (
         <>
           <div className="trend-summary-grid">
-            <TrendMetric label="Average" value={average} detail={metricDetail} />
-            <TrendMetric label="Best" value={best} detail={metricDetail} />
             <TrendMetric
-              label="Personal reference"
-              value={personalReference}
+              detail={metricDetail}
+              formatValue={formatValue}
+              label="Window average"
+              neutral={!isStrokesGained}
+              value={average}
+            />
+            <TrendMetric
+              detail={metricDetail}
+              formatValue={formatValue}
+              label="Best round"
+              neutral={!isStrokesGained}
+              value={best}
+            />
+            <TrendMetric
               detail={
-                personalReference === null
+                isStrokesGained && reference === null
                   ? 'Needs 5 eligible rounds'
                   : metricDetail
               }
+              formatValue={formatValue}
+              label={isStrokesGained ? 'Personal reference' : 'Filtered average'}
+              neutral={!isStrokesGained}
+              value={reference}
             />
           </div>
 
           <TrendChart
+            emptyMessage={
+              isStrokesGained
+                ? undefined
+                : 'The selected rounds do not contain opportunities for this traditional statistic.'
+            }
+            formatValue={formatValue}
+            headerControl={
+              <TrendMetricSelector
+                selectedMetric={selectedMetric}
+                onChange={setSelectedMetric}
+              />
+            }
             label={metricLabel}
             metricDetail={metricDetail}
-            personalReference={personalReference}
+            personalReference={reference}
+            personalReferenceLabel={
+              isStrokesGained ? 'Your average' : 'Filtered average'
+            }
+            pointClass={(value) => {
+              if (isStrokesGained) return value >= 0 ? 'positive' : 'negative'
+              if (reference === null) return 'neutral'
+              const isBetter = higherIsBetter
+                ? value >= reference
+                : value <= reference
+              return isBetter ? 'positive' : 'negative'
+            }}
             points={points}
+            showPgaReference={isStrokesGained}
           />
 
           <TraditionalStatsPanel
@@ -260,115 +318,17 @@ export function Trends({
             stats={traditionalStats}
           />
 
-          <div className="card traditional-trend-controls">
-            <label>
-              Traditional-stat chart
-              <select
-                value={traditionalMetric}
-                onChange={(event) =>
-                  setTraditionalMetric(
-                    event.target.value as TraditionalTrendMetric,
-                  )
-                }
-              >
-                {TRADITIONAL_METRIC_GROUPS.map((group) => (
-                  <optgroup label={group} key={group}>
-                    {(
-                      Object.entries(TRADITIONAL_TREND_METRICS) as Array<
-                        [
-                          TraditionalTrendMetric,
-                          (typeof TRADITIONAL_TREND_METRICS)[TraditionalTrendMetric],
-                        ]
-                      >
-                    )
-                      .filter(([, definition]) => definition.group === group)
-                      .map(([key, definition]) => (
-                        <option value={key} key={key}>
-                          {definition.label}
-                        </option>
-                      ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
-            <div className="traditional-trend-summary">
-              <TraditionalTrendSummary
-                format={traditionalDefinition.format}
-                label="Window average"
-                value={traditionalWindowAverage}
-              />
-              <TraditionalTrendSummary
-                format={traditionalDefinition.format}
-                label="Best round"
-                value={traditionalBest}
-              />
-            </div>
-          </div>
-
-          <TrendChart
-            emptyMessage="The selected rounds do not contain opportunities for this traditional statistic."
-            formatValue={traditionalDefinition.format}
-            label={traditionalDefinition.label}
-            metricDetail={traditionalDefinition.detail}
-            personalReference={traditionalReference}
-            personalReferenceLabel="Filtered average"
-            pointClass={(value) => {
-              if (traditionalReference === null) return 'neutral'
-              const isBetter = traditionalDefinition.higherIsBetter
-                ? value >= traditionalReference
-                : value <= traditionalReference
-              return isBetter ? 'positive' : 'negative'
-            }}
-            points={traditionalPoints}
-            showPgaReference={false}
-          />
-
-          <div className="card course-splits-card">
-            <div className="section-heading compact-heading">
-              <div>
-                <span className="eyebrow">Course and tee comparison</span>
-                <h2>Splits</h2>
-              </div>
-              <span className="pill">Last {displayedRounds.length}</span>
-            </div>
-            {splits.length === 0 ? (
-              <p className="muted split-empty">
-                No supported {metricLabel.toLowerCase()} values are available.
-              </p>
-            ) : (
-              <div className="course-split-table">
-                <div className="course-split-row table-header">
-                  <span>Course / tees</span>
-                  <span>Rounds</span>
-                  <span>Average</span>
-                  <span>Best</span>
-                </div>
-                {splits.map((split) => (
-                  <div className="course-split-row" key={split.key}>
-                    <span>
-                      <strong>{split.courseName}</strong>
-                      <small>{split.teeName}</small>
-                    </span>
-                    <span>{split.rounds}</span>
-                    <strong className={split.average >= 0 ? 'positive' : 'negative'}>
-                      {formatMetric(split.average)}
-                    </strong>
-                    <strong className={split.best >= 0 ? 'positive' : 'negative'}>
-                      {formatMetric(split.best)}
-                    </strong>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
           <div className="card club-analytics-card">
             <div className="section-heading compact-heading">
               <div>
                 <span className="eyebrow">Club analytics</span>
                 <h2>Performance by club</h2>
               </div>
-              <span className="pill">{CATEGORY_LABELS[category as ShotCategory] ?? 'All shots'}</span>
+              <span className="pill">
+                {clubCategory === 'total'
+                  ? 'All shots'
+                  : CATEGORY_LABELS[clubCategory]}
+              </span>
             </div>
             {clubMetrics.length === 0 ? (
               <p className="muted split-empty">
@@ -437,41 +397,78 @@ export function Trends({
   )
 }
 
-function TraditionalTrendSummary({
-  format,
-  label,
-  value,
+function TrendMetricSelector({
+  selectedMetric,
+  onChange,
 }: {
-  format: (value: number) => string
-  label: string
-  value: number | null
+  selectedMetric: TrendMetricSelection
+  onChange: (metric: TrendMetricSelection) => void
 }) {
   return (
-    <span>
-      <small>{label}</small>
-      <strong>{value === null ? 'N/A' : format(value)}</strong>
-    </span>
+    <label className="trend-chart-selector">
+      Metric
+      <select
+        value={selectedMetric}
+        onChange={(event) =>
+          onChange(event.target.value as TrendMetricSelection)
+        }
+      >
+        <optgroup label="Strokes gained">
+          {SG_METRICS.map((metric) => (
+            <option value={metric.key} key={metric.key}>
+              {metric.label}
+            </option>
+          ))}
+        </optgroup>
+        {TRADITIONAL_METRIC_GROUPS.map((group) => (
+          <optgroup label={group} key={group}>
+            {(
+              Object.entries(TRADITIONAL_TREND_METRICS) as Array<
+                [
+                  TraditionalTrendMetric,
+                  (typeof TRADITIONAL_TREND_METRICS)[TraditionalTrendMetric],
+                ]
+              >
+            )
+              .filter(([, definition]) => definition.group === group)
+              .map(([key, definition]) => (
+                <option value={`traditional:${key}`} key={key}>
+                  {definition.label}
+                </option>
+              ))}
+          </optgroup>
+        ))}
+      </select>
+    </label>
   )
 }
 
 function TrendMetric({
+  formatValue = formatMetric,
   label,
   value,
   detail,
+  neutral = false,
 }: {
+  formatValue?: (value: number) => string
   label: string
   value: number | null
   detail: string
+  neutral?: boolean
 }) {
   return (
     <div className="metric-card">
       <span>{label}</span>
       <strong
         className={
-          value === null ? 'neutral-metric' : value >= 0 ? 'positive' : 'negative'
+          value === null || neutral
+            ? 'neutral-metric'
+            : value >= 0
+              ? 'positive'
+              : 'negative'
         }
       >
-        {formatMetric(value)}
+        {value === null ? 'N/A' : formatValue(value)}
       </strong>
       <small>{detail}</small>
     </div>
@@ -481,6 +478,7 @@ function TrendMetric({
 function TrendChart({
   emptyMessage = 'These rounds do not contain supported shots for the selected metric.',
   formatValue = formatMetric,
+  headerControl,
   label,
   metricDetail,
   personalReference,
@@ -491,6 +489,7 @@ function TrendChart({
 }: {
   emptyMessage?: string
   formatValue?: (value: number) => string
+  headerControl?: ReactNode
   label: string
   metricDetail: string
   personalReference: number | null
@@ -516,6 +515,7 @@ function TrendChart({
             <span className="eyebrow">{label}</span>
             <h2>No supported values</h2>
           </div>
+          {headerControl}
         </div>
         <p className="muted">{emptyMessage}</p>
       </div>
@@ -550,16 +550,19 @@ function TrendChart({
           <span className="eyebrow">{label}</span>
           <h2>{metricDetail}</h2>
         </div>
-        <div className="trend-legend" aria-label="Chart reference lines">
-          <span className="trend-legend-series">Round</span>
-          {showPgaReference && (
-            <span className="trend-legend-pga">PGA Tour</span>
-          )}
-          {personalReference !== null && (
-            <span className="trend-legend-personal">
-              {personalReferenceLabel}
-            </span>
-          )}
+        <div className="trend-chart-tools">
+          {headerControl}
+          <div className="trend-legend" aria-label="Chart reference lines">
+            <span className="trend-legend-series">Round</span>
+            {showPgaReference && (
+              <span className="trend-legend-pga">PGA Tour</span>
+            )}
+            {personalReference !== null && (
+              <span className="trend-legend-personal">
+                {personalReferenceLabel}
+              </span>
+            )}
+          </div>
         </div>
       </div>
       <div className="trend-chart-scroll">

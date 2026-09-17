@@ -764,36 +764,6 @@ nav {
   padding: 14px 22px 18px;
 }
 
-.traditional-trend-controls {
-  align-items: end;
-  display: grid;
-  gap: 24px;
-  grid-template-columns: minmax(240px, 1fr) auto;
-  margin-bottom: 16px;
-}
-
-.traditional-trend-summary {
-  display: flex;
-  gap: 28px;
-}
-
-.traditional-trend-summary span,
-.traditional-trend-summary small,
-.traditional-trend-summary strong {
-  display: block;
-}
-
-.traditional-trend-summary small {
-  color: var(--muted);
-  margin-bottom: 5px;
-}
-
-.traditional-trend-summary strong {
-  color: var(--ink);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 24px;
-}
-
 .trend-chart-card {
   margin-bottom: 24px;
   padding: 24px;
@@ -813,6 +783,22 @@ nav {
   font-size: 28px;
   font-weight: 500;
   margin: 5px 0 0;
+}
+
+.trend-chart-tools {
+  align-items: flex-end;
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+}
+
+.trend-chart-selector {
+  gap: 5px;
+  min-width: min(320px, 45vw);
+}
+
+.trend-chart-selector select {
+  min-height: 40px;
 }
 
 .trend-legend {
@@ -915,40 +901,9 @@ nav {
   fill: var(--green);
 }
 
-.course-splits-card {
-  overflow: hidden;
-}
-
 .club-analytics-card {
   margin-top: 24px;
   overflow: hidden;
-}
-
-.course-split-table {
-  border-top: 1px solid var(--line);
-}
-
-.course-split-row {
-  align-items: center;
-  border-top: 1px solid var(--line);
-  display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(80px, 0.6fr));
-  padding: 15px 22px;
-}
-
-.course-split-row:first-child {
-  border-top: 0;
-}
-
-.course-split-row small,
-.course-split-row strong {
-  display: block;
-}
-
-.course-split-row small {
-  color: var(--muted);
-  margin-top: 3px;
 }
 
 .split-empty {
@@ -1916,15 +1871,6 @@ button:disabled {
     padding: 20px 16px;
   }
 
-  .traditional-trend-controls {
-    align-items: stretch;
-    grid-template-columns: 1fr;
-  }
-
-  .traditional-trend-summary {
-    justify-content: space-between;
-  }
-
   .traditional-stat-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -2109,11 +2055,12 @@ button:disabled {
     display: grid;
   }
 
-  .course-split-row {
-    font-size: 12px;
-    gap: 8px;
-    grid-template-columns: minmax(105px, 1fr) repeat(3, auto);
-    padding: 13px 12px;
+  .trend-chart-tools {
+    justify-items: stretch;
+  }
+
+  .trend-chart-selector {
+    min-width: 0;
   }
 
   .club-analytics-table {
