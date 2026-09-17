@@ -1168,6 +1168,17 @@ textarea:focus {
   margin-top: 4px;
 }
 
+.course-catalog-status {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.course-catalog-status .bag-description {
+  margin-right: auto;
+}
+
 .course-insight-summary {
   display: grid;
   gap: 14px;

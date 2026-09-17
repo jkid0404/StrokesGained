@@ -8,6 +8,10 @@
       "allowedRoles": ["anonymous", "authenticated"]
     },
     {
+      "route": "/api/*",
+      "allowedRoles": ["authenticated"]
+    },
+    {
       "route": "/sw.js",
       "headers": {
         "Cache-Control": "no-cache"

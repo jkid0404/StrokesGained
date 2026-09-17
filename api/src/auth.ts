@@ -6,8 +6,12 @@ export interface ClientPrincipal {
 }
 
 export type AuthorizationResult =
-  | { authorized: true; principal: ClientPrincipal }
-  | { authorized: false; status: 401 | 403 | 500; message: string }
+  | {
+      authorized: true
+      principal: ClientPrincipal
+      isAdmin: boolean
+    }
+  | { authorized: false; status: 401 | 403; message: string }
 
 export function normalizeUserDetails(value: string): string {
   return value.trim().toLocaleLowerCase('en-US')
@@ -41,33 +45,39 @@ export function parseClientPrincipal(encoded: string | null): ClientPrincipal | 
 
 export function authorizePrincipal(
   encodedPrincipal: string | null,
-  allowedUserEmail: string | undefined,
+  bootstrapAdminEmail: string | undefined,
 ): AuthorizationResult {
   const principal = parseClientPrincipal(encodedPrincipal)
   if (!principal) {
     return { authorized: false, status: 401, message: 'Authentication is required.' }
   }
 
-  if (!allowedUserEmail?.trim()) {
-    return {
-      authorized: false,
-      status: 500,
-      message: 'The API allowlist is not configured.',
-    }
-  }
-
-  if (
-    normalizeUserDetails(principal.userDetails) !==
-    normalizeUserDetails(allowedUserEmail)
-  ) {
+  if (principal.identityProvider.toLocaleLowerCase('en-US') !== 'aad') {
     return {
       authorized: false,
       status: 403,
-      message: 'This account is not allowed to access the application.',
+      message: 'Microsoft authentication is required.',
     }
   }
 
-  return { authorized: true, principal }
+  const roles = new Set(
+    principal.userRoles.map((role) => role.toLocaleLowerCase('en-US')),
+  )
+  const isBootstrapAdmin =
+    Boolean(bootstrapAdminEmail?.trim()) &&
+    normalizeUserDetails(principal.userDetails) ===
+      normalizeUserDetails(bootstrapAdminEmail!)
+  const isAdmin = isBootstrapAdmin || roles.has('admin')
+
+  if (!isAdmin && !roles.has('golfer')) {
+    return {
+      authorized: false,
+      status: 403,
+      message: 'This Microsoft account has not been invited to the application.',
+    }
+  }
+
+  return { authorized: true, principal, isAdmin }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

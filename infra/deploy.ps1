@@ -2,7 +2,7 @@
 param(
   [Parameter(Mandatory = $true)]
   [ValidateNotNullOrEmpty()]
-  [string]$AllowedUserEmail,
+  [string]$AdminUserEmail,
 
   [ValidatePattern('^[a-z0-9]{3,20}$')]
   [string]$Prefix = 'strokesgained',
@@ -37,7 +37,7 @@ $outputsJson = az deployment group create `
   --resource-group $ResourceGroupName `
   --subscription $SubscriptionId `
   --template-file (Join-Path $PSScriptRoot 'main.bicep') `
-  --parameters prefix=$Prefix location=$Location allowedUserEmail=$AllowedUserEmail `
+  --parameters prefix=$Prefix location=$Location adminUserEmail=$AdminUserEmail `
   --query properties.outputs `
   --output json
 if ($LASTEXITCODE -ne 0) { throw 'Bicep deployment failed.' }

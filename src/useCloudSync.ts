@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   CloudConflictError,
   CloudRequestError,
+  fetchAccessState,
   fetchAuthState,
   fetchCloudState,
   putCloudState,
@@ -14,7 +15,12 @@ import {
   type LocalState,
 } from './cloudState'
 import {
+  clearLastOwnerId,
+  hasScopedLocalState,
+  loadLastOwnerId,
   loadCloudMetadata,
+  loadScopedLocalState,
+  saveLastOwnerId,
   saveCloudMetadata,
   type CloudMetadata,
 } from './storage'
@@ -41,6 +47,8 @@ export interface CloudSyncController {
   syncMessage: string
   pendingChanges: number
   canUseApp: boolean
+  isAdmin: boolean
+  storageOwnerId: string | null | undefined
   reloadCloudData: () => void
 }
 
@@ -54,8 +62,13 @@ export function useCloudSync({
   const [syncMessage, setSyncMessage] = useState('Checking sign-in…')
   const [ready, setReady] = useState(false)
   const [retryToken, setRetryToken] = useState(0)
+  const [authRetryToken, setAuthRetryToken] = useState(0)
   const [conflictState, setConflictState] = useState<CloudState | null>(null)
   const [pendingChanges, setPendingChanges] = useState(0)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [storageOwnerId, setStorageOwnerId] = useState<
+    string | null | undefined
+  >(undefined)
   const localFingerprint = stateFingerprint(localState)
 
   const localStateRef = useRef(localState)
@@ -113,11 +126,30 @@ export function useCloudSync({
           setSyncStatus('local-only')
           setSyncMessage('Local only')
           setReady(true)
+          setStorageOwnerId(null)
         } else if (!result.principal) {
+          const offlineOwnerId = !navigator.onLine ? loadLastOwnerId() : null
+          if (offlineOwnerId) {
+            const offlineState = loadScopedLocalState(offlineOwnerId)
+            applyStateRef.current(offlineState)
+            localStateRef.current = offlineState
+            setPrincipal(null)
+            setIsAdmin(false)
+            setAuthMode('local')
+            setSyncStatus('offline')
+            setSyncMessage('Offline · signed-in data cached locally')
+            setStorageOwnerId(offlineOwnerId)
+            setReady(true)
+            return
+          }
+          if (navigator.onLine) clearLastOwnerId()
+          setPrincipal(null)
+          setIsAdmin(false)
           setAuthMode('signed-out')
           setSyncStatus('loading')
           setSyncMessage('Sign in to sync')
           setReady(false)
+          setStorageOwnerId(undefined)
         } else {
           setPrincipal(result.principal)
           setAuthMode('signed-in')
@@ -131,21 +163,41 @@ export function useCloudSync({
           setSyncStatus('local-only')
           setSyncMessage('Local only')
           setReady(true)
+          setStorageOwnerId(null)
         }
       })
     return () => controller.abort()
-  }, [])
+  }, [authRetryToken])
 
   useEffect(() => {
     if (authMode !== 'signed-in' || !principal) return
 
     const controller = new AbortController()
     const ownerId = principal.userId
+    const lastOwnerId = loadLastOwnerId()
+    const previouslyAuthorized = lastOwnerId === ownerId
+    if (lastOwnerId && lastOwnerId !== ownerId) clearLastOwnerId()
+    const legacyMetadata = loadCloudMetadata()
+    const scopedState = hasScopedLocalState(ownerId)
+      ? loadScopedLocalState(ownerId)
+      : legacyMetadata?.ownerId === ownerId
+        ? localStateRef.current
+        : loadScopedLocalState(ownerId)
+    applyStateRef.current(scopedState)
+    localStateRef.current = scopedState
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) setStorageOwnerId(ownerId)
+    })
 
-    fetchCloudState(controller.signal)
-      .then(async (cloudState) => {
+    Promise.all([
+      fetchAccessState(controller.signal),
+      fetchCloudState(controller.signal),
+    ])
+      .then(async ([access, cloudState]) => {
         if (controller.signal.aborted) return
-        const decision = decideBootstrap(localStateRef.current, cloudState)
+        setIsAdmin(access.isAdmin)
+        saveLastOwnerId(ownerId)
+        const decision = decideBootstrap(scopedState, cloudState)
         revisionRef.current = decision.revision
         initializedOwnerRef.current = ownerId
 
@@ -175,10 +227,13 @@ export function useCloudSync({
         if (controller.signal.aborted) return
         if (error instanceof CloudRequestError && error.status === 403) {
           initializedOwnerRef.current = null
+          setIsAdmin(false)
+          clearLastOwnerId()
           setAuthMode('denied')
           setSyncStatus('error')
           setSyncMessage('Account not allowed')
           setReady(false)
+          setStorageOwnerId(undefined)
           return
         }
         if (error instanceof CloudConflictError) {
@@ -188,8 +243,19 @@ export function useCloudSync({
           setReady(true)
           return
         }
+        if (!previouslyAuthorized) {
+          initializedOwnerRef.current = null
+          setAuthMode('denied')
+          setSyncStatus('error')
+          setSyncMessage('Unable to verify account access')
+          setStorageOwnerId(undefined)
+          setReady(false)
+          return
+        }
 
-        const cached = loadCloudMetadata()
+        const cached =
+          loadCloudMetadata(ownerId) ??
+          (legacyMetadata?.ownerId === ownerId ? legacyMetadata : null)
         if (cached?.ownerId === ownerId) {
           revisionRef.current = cached.revision
           lastSyncedRef.current = cached.fingerprint
@@ -306,6 +372,13 @@ export function useCloudSync({
       }
     }
     const handleOnline = () => {
+      if (authMode === 'local' && typeof storageOwnerId === 'string') {
+        setAuthMode('checking')
+        setReady(false)
+        setStorageOwnerId(undefined)
+        setAuthRetryToken((value) => value + 1)
+        return
+      }
       retryAttemptRef.current = 0
       clearRetry()
       lastSyncedRef.current = ''
@@ -317,7 +390,7 @@ export function useCloudSync({
       window.removeEventListener('offline', handleOffline)
       window.removeEventListener('online', handleOnline)
     }
-  }, [authMode, clearRetry])
+  }, [authMode, clearRetry, storageOwnerId])
 
   const reloadCloudData = useCallback(() => {
     if (!conflictState || !principal) return
@@ -346,6 +419,8 @@ export function useCloudSync({
     syncMessage,
     pendingChanges,
     canUseApp: authMode === 'local' || (authMode === 'signed-in' && ready),
+    isAdmin,
+    storageOwnerId,
     reloadCloudData,
   }
 
@@ -378,5 +453,5 @@ function persistMetadata(ownerId: string, state: CloudState): void {
     updatedAt: state.updatedAt,
     fingerprint: stateFingerprint(state),
   }
-  saveCloudMetadata(metadata)
+  saveCloudMetadata(metadata, ownerId)
 }

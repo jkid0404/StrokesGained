@@ -21,7 +21,16 @@ export class CloudRequestError extends Error {
   }
 }
 
+export interface AccessState {
+  isAdmin: boolean
+  roles: string[]
+}
+
 export async function fetchAuthState(signal?: AbortSignal): Promise<AuthResult> {
+  const localHost =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '::1'
   try {
     const response = await fetch('/.auth/me', {
       headers: { Accept: 'application/json' },
@@ -29,20 +38,16 @@ export async function fetchAuthState(signal?: AbortSignal): Promise<AuthResult> 
       signal,
     })
     if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
-      return { available: false, principal: null }
+      return { available: !localHost, principal: null }
     }
 
     const body = (await response.json()) as { clientPrincipal?: ClientPrincipal | null }
     if (!Object.prototype.hasOwnProperty.call(body, 'clientPrincipal')) {
-      return { available: false, principal: null }
+      return { available: !localHost, principal: null }
     }
     return { available: true, principal: body.clientPrincipal ?? null }
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
-    const localHost =
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname === '::1'
     return { available: !localHost, principal: null }
   }
 }
@@ -54,6 +59,31 @@ export async function fetchCloudState(signal?: AbortSignal): Promise<CloudState>
     signal,
   })
   return parseStateResponse(response)
+}
+
+export async function fetchAccessState(
+  signal?: AbortSignal,
+): Promise<AccessState> {
+  const response = await fetch('/api/access', {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+    signal,
+  })
+  const body = (await response.json().catch(() => null)) as
+    | (Partial<AccessState> & { error?: string })
+    | null
+  if (
+    !response.ok ||
+    typeof body?.isAdmin !== 'boolean' ||
+    !Array.isArray(body.roles) ||
+    !body.roles.every((role) => typeof role === 'string')
+  ) {
+    throw new CloudRequestError(
+      body?.error ?? `Access check failed with status ${response.status}.`,
+      response.status,
+    )
+  }
+  return { isAdmin: body.isAdmin, roles: body.roles }
 }
 
 export async function putCloudState(

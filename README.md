@@ -31,12 +31,18 @@ When hosted on Azure Static Web Apps, the app adds private cross-device sync:
 - Azure Functions v4 Node/TypeScript API under `api/`.
 - Cosmos DB serverless SQL API with one document per authenticated owner and
   partition key `/ownerId`.
+- Static Web Apps invitation roles (`golfer` and `admin`) for Microsoft-account
+  access. The configured bootstrap administrator can manage the app before
+  accepting the formal role invitation.
+- A separate shared Cosmos course catalog. All invited golfers can read shared
+  scorecards, while only administrators can change them. Rounds, shots, trends,
+  and course insights remain private to each owner.
 - Revision-based optimistic concurrency. Conflicts are shown in the UI and are
   never silently overwritten.
 
 The API derives `ownerId` only from the trusted `x-ms-client-principal` header.
-It normalizes the principal's `userDetails` and requires an exact match with the
-`ALLOWED_USER_EMAIL` application setting.
+It accepts only Microsoft identities with the `golfer` or `admin` role. The
+`ADMIN_USER_EMAIL` application setting bootstraps the first administrator.
 
 ## Prerequisites
 
@@ -78,8 +84,10 @@ in tracked files.
 
 ## Data migration and synchronization
 
-Existing rounds, courses, and deleted-course keys remain in localStorage. On
-the first authenticated synchronization:
+Authenticated browser data is namespaced by the Static Web Apps `userId`, so
+accounts using the same browser profile never share local rounds, clubs, or
+sync metadata. Existing unscoped data is migrated only when its saved owner ID
+matches the authenticated account. On the first authenticated synchronization:
 
 1. If no Cosmos owner document exists and local data is non-empty, local data is
    uploaded.
@@ -89,8 +97,14 @@ the first authenticated synchronization:
 4. Offline or failed saves leave local data intact. Revision conflicts show an
    explicit **Reload cloud data** action.
 
-The cloud document contains `rounds`, `courses`, `deletedCourseKeys`,
+The private cloud document contains `rounds`, personal `courses`,
+`deletedCourseKeys`,
 `revision`, `updatedAt`, and the server-derived `ownerId`.
+
+Shared course definitions are stored separately in the `courses` Cosmos
+container. The shared catalog is cached per account for offline use and uses its
+own revision-based conflict protection. Personal course templates remain
+available for ad-hoc rounds; matching shared definitions take precedence.
 
 ## Azure deployment
 
@@ -101,10 +115,10 @@ lowercase prefix. No credentials are emitted as deployment outputs.
 After `az login`, run:
 
 ```powershell
-.\infra\deploy.ps1 -AllowedUserEmail 'you@example.com'
+.\infra\deploy.ps1 -AdminUserEmail 'you@example.com'
 ```
 
-`AllowedUserEmail` is mandatory and is neither committed nor hardcoded. The
+`AdminUserEmail` is mandatory and is neither committed nor hardcoded. The
 script selects the required subscription, creates `StrokesGained` if needed,
 and deploys Bicep. Bicep configures these Static Web Apps application settings
 without returning the Cosmos credential to the caller:
@@ -112,14 +126,13 @@ without returning the Cosmos credential to the caller:
 - `COSMOS_CONNECTION_STRING`
 - `COSMOS_DATABASE_NAME`
 - `COSMOS_CONTAINER_NAME`
-- `ALLOWED_USER_EMAIL`
+- `COSMOS_COURSES_CONTAINER_NAME`
+- `ADMIN_USER_EMAIL`
 
 The script then prints the command for retrieving the Static Web Apps deployment
 token. The client SPA stays anonymously loadable so React can present a sign-in
-screen. The API validates the trusted Static Web Apps principal header and
-enforces the single-user email allowlist itself. This avoids a duplicate route
-role gate that can reject valid personal Microsoft identities before the
-function receives them.
+screen. API routes require an authenticated Static Web Apps session, and each
+function validates the trusted principal plus the application role itself.
 
 Provisioned Azure resources:
 
@@ -128,9 +141,26 @@ Provisioned Azure resources:
 - URL: `https://blue-coast-04c2a1b1e.3.azurestaticapps.net`
 - Cosmos DB account: `golfsgjkidwhrbxmw3qdbc6`
 
-The initial allowlisted identity is `jasowang@umich.edu`. Change
-`ALLOWED_USER_EMAIL` in the Static Web App settings if the Microsoft account
-used at sign-in has a different email.
+The bootstrap administrator is `jasowang@umich.edu`. Additional golfers are
+added through Static Web Apps Role Management with the `golfer` role; course
+editors receive both `golfer` and `admin`.
+
+Example invitation:
+
+```powershell
+az staticwebapp users invite `
+  --name golfsgjkid-whrbxmw3qdbc6 `
+  --resource-group StrokesGained `
+  --authentication-provider AAD `
+  --user-details golfer@example.com `
+  --roles golfer `
+  --domain blue-coast-04c2a1b1e.3.azurestaticapps.net `
+  --invitation-expiration-in-hours 168
+```
+
+Azure generates an invitation URL for the administrator to send to the user.
+Removing the `golfer` role revokes app access without deleting private round
+data.
 
 ## GitHub deployment
 

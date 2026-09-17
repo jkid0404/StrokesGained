@@ -1,10 +1,15 @@
 import { CLUB_OPTIONS, type CourseTemplate, type Round } from './domain'
+import type { LocalState } from './cloudState'
 
 const STORAGE_KEY = 'golf-strokes-gained-rounds-v1'
 const COURSES_STORAGE_KEY = 'golf-strokes-gained-courses-v1'
 const DELETED_COURSES_STORAGE_KEY = 'golf-strokes-gained-deleted-courses-v1'
 const CLUBS_STORAGE_KEY = 'golf-strokes-gained-clubs-v1'
 const CLOUD_METADATA_STORAGE_KEY = 'golf-strokes-gained-cloud-metadata-v1'
+const SHARED_COURSE_METADATA_STORAGE_KEY =
+  'golf-strokes-gained-shared-course-metadata-v1'
+const SHARED_COURSES_STORAGE_KEY = 'golf-strokes-gained-shared-courses-v1'
+const LAST_OWNER_STORAGE_KEY = 'golf-strokes-gained-last-owner-v1'
 
 export interface CloudMetadata {
   ownerId: string
@@ -13,48 +18,67 @@ export interface CloudMetadata {
   fingerprint: string
 }
 
-export function loadRounds(): Round[] {
+export interface SharedCourseMetadata {
+  revision: number
+  fingerprint: string
+}
+
+export function loadRounds(ownerId?: string | null): Round[] {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(scopedKey(STORAGE_KEY, ownerId))
     return raw ? (JSON.parse(raw) as Round[]) : []
   } catch {
     return []
   }
 }
 
-export function saveRounds(rounds: Round[]): void {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(rounds))
+export function saveRounds(rounds: Round[], ownerId?: string | null): void {
+  window.localStorage.setItem(scopedKey(STORAGE_KEY, ownerId), JSON.stringify(rounds))
 }
 
-export function loadCourses(): CourseTemplate[] {
+export function loadCourses(ownerId?: string | null): CourseTemplate[] {
   try {
-    const raw = window.localStorage.getItem(COURSES_STORAGE_KEY)
+    const raw = window.localStorage.getItem(scopedKey(COURSES_STORAGE_KEY, ownerId))
     return raw ? (JSON.parse(raw) as CourseTemplate[]) : []
   } catch {
     return []
   }
 }
 
-export function saveCourses(courses: CourseTemplate[]): void {
-  window.localStorage.setItem(COURSES_STORAGE_KEY, JSON.stringify(courses))
+export function saveCourses(
+  courses: CourseTemplate[],
+  ownerId?: string | null,
+): void {
+  window.localStorage.setItem(
+    scopedKey(COURSES_STORAGE_KEY, ownerId),
+    JSON.stringify(courses),
+  )
 }
 
-export function loadDeletedCourseKeys(): string[] {
+export function loadDeletedCourseKeys(ownerId?: string | null): string[] {
   try {
-    const raw = window.localStorage.getItem(DELETED_COURSES_STORAGE_KEY)
+    const raw = window.localStorage.getItem(
+      scopedKey(DELETED_COURSES_STORAGE_KEY, ownerId),
+    )
     return raw ? (JSON.parse(raw) as string[]) : []
   } catch {
     return []
   }
 }
 
-export function saveDeletedCourseKeys(keys: string[]): void {
-  window.localStorage.setItem(DELETED_COURSES_STORAGE_KEY, JSON.stringify(keys))
+export function saveDeletedCourseKeys(
+  keys: string[],
+  ownerId?: string | null,
+): void {
+  window.localStorage.setItem(
+    scopedKey(DELETED_COURSES_STORAGE_KEY, ownerId),
+    JSON.stringify(keys),
+  )
 }
 
-export function loadClubs(): string[] {
+export function loadClubs(ownerId?: string | null): string[] {
   try {
-    const raw = window.localStorage.getItem(CLUBS_STORAGE_KEY)
+    const raw = window.localStorage.getItem(scopedKey(CLUBS_STORAGE_KEY, ownerId))
     if (!raw) return [...CLUB_OPTIONS]
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed) &&
@@ -66,13 +90,15 @@ export function loadClubs(): string[] {
   }
 }
 
-export function saveClubs(clubs: string[]): void {
-  window.localStorage.setItem(CLUBS_STORAGE_KEY, JSON.stringify(clubs))
+export function saveClubs(clubs: string[], ownerId?: string | null): void {
+  window.localStorage.setItem(scopedKey(CLUBS_STORAGE_KEY, ownerId), JSON.stringify(clubs))
 }
 
-export function loadCloudMetadata(): CloudMetadata | null {
+export function loadCloudMetadata(ownerId?: string | null): CloudMetadata | null {
   try {
-    const raw = window.localStorage.getItem(CLOUD_METADATA_STORAGE_KEY)
+    const raw = window.localStorage.getItem(
+      scopedKey(CLOUD_METADATA_STORAGE_KEY, ownerId),
+    )
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<CloudMetadata>
     if (
@@ -90,6 +116,97 @@ export function loadCloudMetadata(): CloudMetadata | null {
   }
 }
 
-export function saveCloudMetadata(metadata: CloudMetadata): void {
-  window.localStorage.setItem(CLOUD_METADATA_STORAGE_KEY, JSON.stringify(metadata))
+export function saveCloudMetadata(
+  metadata: CloudMetadata,
+  ownerId?: string | null,
+): void {
+  window.localStorage.setItem(
+    scopedKey(CLOUD_METADATA_STORAGE_KEY, ownerId),
+    JSON.stringify(metadata),
+  )
+}
+
+export function hasScopedLocalState(ownerId: string): boolean {
+  return [
+    STORAGE_KEY,
+    COURSES_STORAGE_KEY,
+    DELETED_COURSES_STORAGE_KEY,
+    CLUBS_STORAGE_KEY,
+  ].some((key) => window.localStorage.getItem(scopedKey(key, ownerId)) !== null)
+}
+
+export function loadScopedLocalState(ownerId: string): LocalState {
+  return {
+    rounds: loadRounds(ownerId),
+    courses: loadCourses(ownerId),
+    deletedCourseKeys: loadDeletedCourseKeys(ownerId),
+    clubs: loadClubs(ownerId),
+  }
+}
+
+export function loadSharedCourseMetadata(
+  ownerId: string,
+): SharedCourseMetadata | null {
+  try {
+    const raw = window.localStorage.getItem(
+      scopedKey(SHARED_COURSE_METADATA_STORAGE_KEY, ownerId),
+    )
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<SharedCourseMetadata>
+    return Number.isSafeInteger(parsed.revision) &&
+      (parsed.revision ?? -1) >= 0 &&
+      typeof parsed.fingerprint === 'string'
+      ? (parsed as SharedCourseMetadata)
+      : null
+  } catch {
+    return null
+  }
+}
+
+export function saveSharedCourseMetadata(
+  ownerId: string,
+  metadata: SharedCourseMetadata,
+): void {
+  window.localStorage.setItem(
+    scopedKey(SHARED_COURSE_METADATA_STORAGE_KEY, ownerId),
+    JSON.stringify(metadata),
+  )
+}
+
+export function loadSharedCourses(ownerId: string): CourseTemplate[] {
+  try {
+    const raw = window.localStorage.getItem(
+      scopedKey(SHARED_COURSES_STORAGE_KEY, ownerId),
+    )
+    return raw ? (JSON.parse(raw) as CourseTemplate[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveSharedCourses(
+  ownerId: string,
+  courses: CourseTemplate[],
+): void {
+  window.localStorage.setItem(
+    scopedKey(SHARED_COURSES_STORAGE_KEY, ownerId),
+    JSON.stringify(courses),
+  )
+}
+
+export function loadLastOwnerId(): string | null {
+  const value = window.localStorage.getItem(LAST_OWNER_STORAGE_KEY)
+  return value?.trim() || null
+}
+
+export function saveLastOwnerId(ownerId: string): void {
+  window.localStorage.setItem(LAST_OWNER_STORAGE_KEY, ownerId)
+}
+
+export function clearLastOwnerId(): void {
+  window.localStorage.removeItem(LAST_OWNER_STORAGE_KEY)
+}
+
+function scopedKey(baseKey: string, ownerId?: string | null): string {
+  return ownerId ? `${baseKey}:user:${encodeURIComponent(ownerId)}` : baseKey
 }

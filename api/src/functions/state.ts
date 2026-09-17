@@ -19,7 +19,7 @@ async function stateHandler(
 ): Promise<HttpResponseInit> {
   const authorization = authorizePrincipal(
     request.headers.get('x-ms-client-principal'),
-    process.env.ALLOWED_USER_EMAIL,
+    process.env.ADMIN_USER_EMAIL,
   )
   if (!authorization.authorized) {
     return json(authorization.status, { error: authorization.message })

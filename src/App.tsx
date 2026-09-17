@@ -30,6 +30,7 @@ import {
   loadCourses,
   loadClubs,
   loadDeletedCourseKeys,
+  clearLastOwnerId,
   loadRounds,
   saveClubs,
   saveCourses,
@@ -44,6 +45,8 @@ import { updateShotInHole } from './shotEditing'
 import { calculateTraditionalStats } from './traditionalStats'
 import { TraditionalStatsPanel } from './TraditionalStatsPanel'
 import { CourseInsightsPage } from './CourseInsightsPage'
+import { useSharedCourses } from './useSharedCourses'
+import { mergeSharedCourses } from './sharedCourses'
 
 type View =
   | 'home'
@@ -91,12 +94,15 @@ function availableDefaultClub(
 
 function App() {
   const [rounds, setRounds] = useState<Round[]>(loadRounds)
-  const [courses, setCourses] = useState<CourseTemplate[]>(() =>
+  const [personalCourses, setPersonalCourses] = useState<CourseTemplate[]>(() =>
     excludeDeletedCourseTemplates(
       mergeCourseTemplates(buildCourseTemplates(loadRounds()), loadCourses()),
       loadDeletedCourseKeys(),
     ),
   )
+  const [sharedCourseCatalog, setSharedCourseCatalog] = useState<
+    CourseTemplate[]
+  >([])
   const [deletedCourseKeys, setDeletedCourseKeys] = useState<string[]>(loadDeletedCourseKeys)
   const [clubs, setClubs] = useState<string[]>(loadClubs)
   const [view, setView] = useState<View>('home')
@@ -104,14 +110,9 @@ function App() {
   const [activeHoleIndex, setActiveHoleIndex] = useState(0)
   const [activeCourseKey, setActiveCourseKey] = useState<string | null>(null)
 
-  useEffect(() => saveRounds(rounds), [rounds])
-  useEffect(() => saveCourses(courses), [courses])
-  useEffect(() => saveDeletedCourseKeys(deletedCourseKeys), [deletedCourseKeys])
-  useEffect(() => saveClubs(clubs), [clubs])
-
   const applyCloudState = useCallback((state: LocalState) => {
     setRounds(state.rounds)
-    setCourses(state.courses)
+    setPersonalCourses(state.courses)
     setDeletedCourseKeys(state.deletedCourseKeys)
     setClubs(state.clubs)
     setActiveRoundId(null)
@@ -120,9 +121,55 @@ function App() {
   }, [])
 
   const cloud = useCloudSync({
-    localState: { rounds, courses, deletedCourseKeys, clubs },
+    localState: {
+      rounds,
+      courses: personalCourses,
+      deletedCourseKeys,
+      clubs,
+    },
     applyState: applyCloudState,
   })
+  const sharedCourses = useSharedCourses({
+    courses: sharedCourseCatalog,
+    enabled:
+      cloud.canUseApp &&
+      (cloud.authMode === 'signed-in' ||
+        typeof cloud.storageOwnerId === 'string'),
+    isAdmin: cloud.isAdmin,
+    ownerId:
+      cloud.principal?.userId ??
+      (typeof cloud.storageOwnerId === 'string'
+        ? cloud.storageOwnerId
+        : null),
+    onChange: setSharedCourseCatalog,
+  })
+  const canManageSharedCourses =
+    cloud.isAdmin && sharedCourses.status === 'saved'
+  const canManageCourses =
+    (cloud.authMode === 'local' && cloud.storageOwnerId === null) ||
+    canManageSharedCourses
+  const courses = mergeSharedCourses(personalCourses, sharedCourseCatalog)
+
+  useEffect(() => {
+    if (cloud.storageOwnerId !== undefined) {
+      saveRounds(rounds, cloud.storageOwnerId)
+    }
+  }, [cloud.storageOwnerId, rounds])
+  useEffect(() => {
+    if (cloud.storageOwnerId !== undefined) {
+      saveCourses(personalCourses, cloud.storageOwnerId)
+    }
+  }, [cloud.storageOwnerId, personalCourses])
+  useEffect(() => {
+    if (cloud.storageOwnerId !== undefined) {
+      saveDeletedCourseKeys(deletedCourseKeys, cloud.storageOwnerId)
+    }
+  }, [cloud.storageOwnerId, deletedCourseKeys])
+  useEffect(() => {
+    if (cloud.storageOwnerId !== undefined) {
+      saveClubs(clubs, cloud.storageOwnerId)
+    }
+  }, [cloud.storageOwnerId, clubs])
   const pwa = usePwaUpdate()
   const roundSyncPending =
     view === 'entry' &&
@@ -149,13 +196,12 @@ function App() {
     const teeName = round.teeName?.trim() || 'Unspecified tees'
     const key = courseKey(round.courseName, teeName)
     setDeletedCourseKeys((keys) => keys.filter((deletedKey) => deletedKey !== key))
-    setCourses((current) => {
-      return current.some((course) => course.key === key)
-        ? current
-        : [...current, { key, name: round.courseName, teeName, holes: {} }].sort(
-            (a, b) => a.name.localeCompare(b.name),
-          )
-    })
+    if (!courses.some((course) => course.key === key)) {
+      setPersonalCourses((current) => [
+        ...current,
+        { key, name: round.courseName, teeName, holes: {} },
+      ].sort((a, b) => a.name.localeCompare(b.name)))
+    }
     setActiveRoundId(round.id)
     const firstIncomplete = round.holes.findIndex(
       (hole) => hole.shots.at(-1)?.finish.lie !== 'holed',
@@ -167,7 +213,12 @@ function App() {
   function updateCourseHole(courseName: string, teeName: string, hole: Hole) {
     const key = courseKey(courseName, teeName)
     setDeletedCourseKeys((keys) => keys.filter((deletedKey) => deletedKey !== key))
-    setCourses((current) => {
+    const sharedCourse = sharedCourseCatalog.some((course) => course.key === key)
+    if (sharedCourse && !canManageSharedCourses) return
+    const setTargetCourses = sharedCourse
+      ? setSharedCourseCatalog
+      : setPersonalCourses
+    setTargetCourses((current) => {
       const existing = current.find((course) => course.key === key)
       const updated: CourseTemplate = {
         key,
@@ -186,7 +237,13 @@ function App() {
   }
 
   function saveCourse(course: CourseTemplate, originalKey: string) {
-    setCourses((current) => {
+    const sharedCourse = sharedCourseCatalog.some(
+      (item) => item.key === originalKey,
+    )
+    const setTargetCourses = sharedCourse && canManageSharedCourses
+      ? setSharedCourseCatalog
+      : setPersonalCourses
+    setTargetCourses((current) => {
       const original = current.find((item) => item.key === originalKey)
       const aliases =
         course.key === originalKey
@@ -216,13 +273,42 @@ function App() {
     setView('courses')
   }
 
+  function shareCourse(course: CourseTemplate) {
+    if (!canManageSharedCourses) return
+    const confirmed = window.confirm(
+      `Share ${course.name} — ${course.teeName} with every invited golfer?`,
+    )
+    if (!confirmed) return
+    setSharedCourseCatalog((current) => [
+      ...current.filter((item) => item.key !== course.key),
+      course,
+    ].sort(
+      (a, b) =>
+        a.name.localeCompare(b.name) || a.teeName.localeCompare(b.teeName),
+    ))
+    setPersonalCourses((current) =>
+      current.filter((item) => item.key !== course.key),
+    )
+  }
+
   function deleteCourse(course: CourseTemplate) {
     const confirmed = window.confirm(
       `Delete ${course.name} — ${course.teeName}? Historical rounds will not be changed.`,
     )
     if (!confirmed) return
 
-    setCourses((current) => current.filter((item) => item.key !== course.key))
+    const isSharedCourse = sharedCourseCatalog.some(
+      (item) => item.key === course.key,
+    )
+    if (isSharedCourse && canManageSharedCourses) {
+      setSharedCourseCatalog((current) =>
+        current.filter((item) => item.key !== course.key),
+      )
+    } else {
+      setPersonalCourses((current) =>
+        current.filter((item) => item.key !== course.key),
+      )
+    }
     setDeletedCourseKeys((keys) =>
       keys.includes(course.key) ? keys : [...keys, course.key],
     )
@@ -292,6 +378,7 @@ function App() {
           </nav>
           <CloudStatus
             authMode={cloud.authMode}
+            isAdmin={cloud.isAdmin}
             status={cloud.syncStatus}
             message={cloud.syncMessage}
             userDetails={cloud.principal?.userDetails ?? null}
@@ -399,7 +486,12 @@ function App() {
         )}
         {view === 'courses' && (
           <CourseLibrary
+            canManage={canManageCourses}
             courses={courses}
+            sharedCourseKeys={sharedCourseCatalog.map((course) => course.key)}
+            onReloadSharedCourses={sharedCourses.reloadServerCatalog}
+            sharedConflict={sharedCourses.status === 'conflict'}
+            sharedStatus={sharedCourses.message}
             onBack={() => setView('home')}
             onDelete={deleteCourse}
             onInsights={(course) => {
@@ -410,6 +502,7 @@ function App() {
               setActiveCourseKey(course.key)
               setView('course-edit')
             }}
+            onShare={shareCourse}
           />
         )}
         {view === 'bag' && (
@@ -463,10 +556,14 @@ function AuthGate({
             <h1>This Microsoft account is not allowed.</h1>
             <p>
               {userDetails
-                ? `${userDetails} is signed in, but it does not match the configured allowlist.`
-                : 'The signed-in account does not match the configured allowlist.'}
+                ? `${userDetails} is signed in, but it has not been invited to this app.`
+                : 'The signed-in account has not been invited to this app.'}
             </p>
-            <a className="secondary auth-link" href="/.auth/logout?post_logout_redirect_uri=/">
+            <a
+              className="secondary auth-link"
+              href="/.auth/logout?post_logout_redirect_uri=/"
+              onClick={clearLastOwnerId}
+            >
               Sign out
             </a>
           </>
@@ -490,11 +587,13 @@ function AuthGate({
 
 function CloudStatus({
   authMode,
+  isAdmin,
   status,
   message,
   userDetails,
 }: {
   authMode: 'checking' | 'local' | 'signed-out' | 'signed-in' | 'denied'
+  isAdmin: boolean
   status: string
   message: string
   userDetails: string | null
@@ -512,11 +611,12 @@ function CloudStatus({
     <div className="cloud-account">
       <div className={`cloud-status ${status}`} title={userDetails ?? message}>
         <span className="status-dot" />
-        <span>{message}</span>
+        <span>{isAdmin ? `Admin · ${message}` : message}</span>
       </div>
       <a
         className="text-button sign-out-link"
         href="/.auth/logout?post_logout_redirect_uri=/"
+        onClick={clearLastOwnerId}
       >
         Sign out
       </a>
@@ -1411,17 +1511,29 @@ function RoundEntry({
 }
 
 function CourseLibrary({
+  canManage,
   courses,
   onBack,
   onDelete,
   onEdit,
   onInsights,
+  onReloadSharedCourses,
+  onShare,
+  sharedCourseKeys,
+  sharedConflict,
+  sharedStatus,
 }: {
+  canManage: boolean
   courses: CourseTemplate[]
   onBack: () => void
   onDelete: (course: CourseTemplate) => void
   onEdit: (course: CourseTemplate) => void
   onInsights: (course: CourseTemplate) => void
+  onReloadSharedCourses: () => void
+  onShare: (course: CourseTemplate) => void
+  sharedCourseKeys: string[]
+  sharedConflict: boolean
+  sharedStatus: string
 }) {
   return (
     <section className="page narrow">
@@ -1430,10 +1542,25 @@ function CourseLibrary({
       </button>
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Saved scorecards</span>
+          <span className="eyebrow">Course scorecards</span>
           <h1 className="page-title">Courses</h1>
         </div>
-        <span className="pill">{courses.length} saved</span>
+        <span className="pill">
+          {canManage ? 'Admin · ' : ''}
+          {courses.length} saved
+        </span>
+      </div>
+      <div className="course-catalog-status">
+        <p className="muted bag-description">{sharedStatus}</p>
+        {sharedConflict && (
+          <button
+            className="secondary compact"
+            type="button"
+            onClick={onReloadSharedCourses}
+          >
+            Reload shared courses
+          </button>
+        )}
       </div>
       {courses.length === 0 ? (
         <div className="empty-state">
@@ -1448,12 +1575,28 @@ function CourseLibrary({
                 <strong>{course.name}</strong>
                 <small>
                   {course.teeName} · {Object.keys(course.holes).length} holes configured
+                  {sharedCourseKeys.includes(course.key) ? ' · Shared' : ' · Personal'}
                 </small>
               </span>
               <div className="course-row-actions">
-                <button className="danger-button" type="button" onClick={() => onDelete(course)}>
-                  Delete
-                </button>
+                {canManage && !sharedCourseKeys.includes(course.key) && (
+                  <button
+                    className="primary"
+                    type="button"
+                    onClick={() => onShare(course)}
+                  >
+                    Share course
+                  </button>
+                )}
+                {(canManage || !sharedCourseKeys.includes(course.key)) && (
+                  <button
+                    className="danger-button"
+                    type="button"
+                    onClick={() => onDelete(course)}
+                  >
+                    Delete
+                  </button>
+                )}
                 <button
                   className="secondary"
                   type="button"
@@ -1461,9 +1604,15 @@ function CourseLibrary({
                 >
                   View insights
                 </button>
-                <button className="secondary" type="button" onClick={() => onEdit(course)}>
-                  Edit course
-                </button>
+                {(canManage || !sharedCourseKeys.includes(course.key)) && (
+                  <button
+                    className="secondary"
+                    type="button"
+                    onClick={() => onEdit(course)}
+                  >
+                    Edit course
+                  </button>
+                )}
               </div>
             </div>
           ))}
