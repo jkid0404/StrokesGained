@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildClubAnalytics,
-  buildCourseSplits,
   buildStrokesGainedSummary,
   filterTrendRounds,
   personalTrendReference,
@@ -66,18 +65,6 @@ describe('trend analytics', () => {
     expect(total).not.toBeNull()
     expect(offTheTee).not.toBeNull()
     expect(total).toBeCloseTo(offTheTee! * 18)
-  })
-
-  it('builds course and tee splits from the selected rounds', () => {
-    const rounds = [
-      makeRound('one', 'Alpha', 'Blue', '2026-01-01', 9, 400),
-      makeRound('two', 'Alpha', 'Blue', '2026-02-01', 9, 400),
-      makeRound('three', 'Alpha', 'White', '2026-03-01', 9, 450),
-    ]
-
-    const splits = buildCourseSplits(rounds, 'total')
-    expect(splits).toHaveLength(2)
-    expect(splits.find((split) => split.teeName === 'Blue')?.rounds).toBe(2)
   })
 
   it('provides personal references after five eligible rounds', () => {

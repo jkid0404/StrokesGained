@@ -1,14 +1,7 @@
 import { CosmosClient, type Container } from '@azure/cosmos'
-import type {
-  CourseCatalogPayload,
-  StoredCourseCatalog,
-} from './courseCatalogModel.js'
+import type { StoredCourseCatalog } from './courseCatalogModel.js'
 
 let container: Container | null = null
-
-export type CourseCatalogWriteResult =
-  | { conflict: false; catalog: StoredCourseCatalog }
-  | { conflict: true; catalog: StoredCourseCatalog | null }
 
 export async function readCourseCatalog(): Promise<StoredCourseCatalog | null> {
   try {
@@ -18,44 +11,6 @@ export async function readCourseCatalog(): Promise<StoredCourseCatalog | null> {
     return response.resource ?? null
   } catch (error) {
     if (getStatusCode(error) === 404) return null
-    throw error
-  }
-}
-
-export async function writeCourseCatalog(
-  payload: CourseCatalogPayload,
-): Promise<CourseCatalogWriteResult> {
-  const current = await readCourseCatalog()
-  const currentRevision = current?.revision ?? 0
-  if (payload.revision !== currentRevision) {
-    return { conflict: true, catalog: current }
-  }
-
-  const next: StoredCourseCatalog = {
-    id: 'catalog',
-    courses: payload.courses,
-    revision: currentRevision + 1,
-    updatedAt: new Date().toISOString(),
-  }
-
-  try {
-    if (!current) {
-      const response = await getContainer().items.create<StoredCourseCatalog>(next)
-      return { conflict: false, catalog: response.resource ?? next }
-    }
-
-    const response = await getContainer()
-      .item('catalog', 'catalog')
-      .replace<StoredCourseCatalog>(next, {
-        accessCondition: current._etag
-          ? { type: 'IfMatch', condition: current._etag }
-          : undefined,
-      })
-    return { conflict: false, catalog: response.resource ?? next }
-  } catch (error) {
-    if (getStatusCode(error) === 409 || getStatusCode(error) === 412) {
-      return { conflict: true, catalog: await readCourseCatalog() }
-    }
     throw error
   }
 }

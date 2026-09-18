@@ -2,7 +2,6 @@ import {
   buildPersonalBaseline,
   calculateRound,
   calculateShot,
-  courseKey,
   type Round,
   type ShotCategory,
 } from './domain'
@@ -33,15 +32,6 @@ export interface StrokesGainedSummary {
       shots: number
     }
   >
-}
-
-export interface CourseSplit {
-  key: string
-  courseName: string
-  teeName: string
-  rounds: number
-  average: number
-  best: number
 }
 
 export interface ClubMetric {
@@ -149,42 +139,6 @@ export function buildStrokesGainedSummary(
       ]),
     ) as StrokesGainedSummary['categories'],
   }
-}
-
-export function buildCourseSplits(
-  rounds: Round[],
-  category: TrendCategory,
-): CourseSplit[] {
-  const groups = new Map<
-    string,
-    { courseName: string; teeName: string; values: number[] }
-  >()
-
-  for (const round of rounds) {
-    const value = trendValue(round, category)
-    if (value === null) continue
-
-    const teeName = normalizedTeeName(round)
-    const key = courseKey(round.courseName, teeName)
-    const group = groups.get(key) ?? {
-      courseName: round.courseName,
-      teeName,
-      values: [],
-    }
-    group.values.push(value)
-    groups.set(key, group)
-  }
-
-  return [...groups.entries()]
-    .map(([key, group]) => ({
-      key,
-      courseName: group.courseName,
-      teeName: group.teeName,
-      rounds: group.values.length,
-      average: mean(group.values),
-      best: Math.max(...group.values),
-    }))
-    .sort((a, b) => b.average - a.average || a.courseName.localeCompare(b.courseName))
 }
 
 export function buildClubAnalytics(

@@ -5,11 +5,9 @@ import {
   loadLastOwnerId,
   loadRounds,
   loadSharedCourses,
-  loadSharedCourseMetadata,
   saveRounds,
   saveLastOwnerId,
   saveSharedCourses,
-  saveSharedCourseMetadata,
 } from './storage'
 import type { Round } from './domain'
 
@@ -44,19 +42,6 @@ describe('account-scoped local storage', () => {
     expect(loadRounds('owner-two')).toEqual(userTwo)
     expect(hasScopedLocalState('owner-one')).toBe(true)
     expect(hasScopedLocalState('unknown')).toBe(false)
-  })
-
-  it('keeps shared catalog revisions scoped to the authenticated user', () => {
-    saveSharedCourseMetadata('owner-one', {
-      revision: 4,
-      fingerprint: 'catalog-one',
-    })
-
-    expect(loadSharedCourseMetadata('owner-one')).toEqual({
-      revision: 4,
-      fingerprint: 'catalog-one',
-    })
-    expect(loadSharedCourseMetadata('owner-two')).toBeNull()
   })
 
   it('keeps the offline shared catalog scoped to the authenticated user', () => {

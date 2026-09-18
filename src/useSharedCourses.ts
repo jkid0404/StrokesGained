@@ -11,7 +11,6 @@ import {
 import {
   loadSharedCourses,
   saveSharedCourses,
-  saveSharedCourseMetadata,
 } from './storage'
 
 export type SharedCourseStatus =
@@ -70,10 +69,6 @@ export function useSharedCourses({
       coursesRef.current = catalog.courses
       onChangeRef.current(catalog.courses)
       saveSharedCourses(ownerId, catalog.courses)
-      saveSharedCourseMetadata(ownerId, {
-        revision: catalog.revision,
-        fingerprint: courseFingerprint(catalog.courses),
-      })
       setRevision(catalog.revision)
       setConflictCatalog(null)
       setStatus('saved')

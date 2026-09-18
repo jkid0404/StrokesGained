@@ -6,8 +6,6 @@ const COURSES_STORAGE_KEY = 'golf-strokes-gained-courses-v1'
 const DELETED_COURSES_STORAGE_KEY = 'golf-strokes-gained-deleted-courses-v1'
 const CLUBS_STORAGE_KEY = 'golf-strokes-gained-clubs-v1'
 const CLOUD_METADATA_STORAGE_KEY = 'golf-strokes-gained-cloud-metadata-v1'
-const SHARED_COURSE_METADATA_STORAGE_KEY =
-  'golf-strokes-gained-shared-course-metadata-v1'
 const SHARED_COURSES_STORAGE_KEY = 'golf-strokes-gained-shared-courses-v1'
 const LAST_OWNER_STORAGE_KEY = 'golf-strokes-gained-last-owner-v1'
 
@@ -15,11 +13,6 @@ export interface CloudMetadata {
   ownerId: string
   revision: number
   updatedAt: string | null
-  fingerprint: string
-}
-
-export interface SharedCourseMetadata {
-  revision: number
   fingerprint: string
 }
 
@@ -142,35 +135,6 @@ export function loadScopedLocalState(ownerId: string): LocalState {
     deletedCourseKeys: loadDeletedCourseKeys(ownerId),
     clubs: loadClubs(ownerId),
   }
-}
-
-export function loadSharedCourseMetadata(
-  ownerId: string,
-): SharedCourseMetadata | null {
-  try {
-    const raw = window.localStorage.getItem(
-      scopedKey(SHARED_COURSE_METADATA_STORAGE_KEY, ownerId),
-    )
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<SharedCourseMetadata>
-    return Number.isSafeInteger(parsed.revision) &&
-      (parsed.revision ?? -1) >= 0 &&
-      typeof parsed.fingerprint === 'string'
-      ? (parsed as SharedCourseMetadata)
-      : null
-  } catch {
-    return null
-  }
-}
-
-export function saveSharedCourseMetadata(
-  ownerId: string,
-  metadata: SharedCourseMetadata,
-): void {
-  window.localStorage.setItem(
-    scopedKey(SHARED_COURSE_METADATA_STORAGE_KEY, ownerId),
-    JSON.stringify(metadata),
-  )
 }
 
 export function loadSharedCourses(ownerId: string): CourseTemplate[] {
