@@ -37,7 +37,6 @@ export function useSharedCourses({
   const [status, setStatus] = useState<SharedCourseStatus>('idle')
   const [message, setMessage] = useState('Shared courses unavailable')
   const [retryToken, setRetryToken] = useState(0)
-  const [revision, setRevision] = useState(0)
   const [conflictCatalog, setConflictCatalog] = useState<{
     courses: CourseTemplate[]
     revision: number
@@ -82,7 +81,6 @@ export function useSharedCourses({
       .then(async (catalog) => {
         if (controller.signal.aborted) return
         revisionRef.current = catalog.revision
-        setRevision(catalog.revision)
         initializedOwnerRef.current = ownerId
         const localFingerprint = courseFingerprint(cachedCourses)
         const metadata = loadSharedCourseMetadata(ownerId)
@@ -94,7 +92,6 @@ export function useSharedCourses({
         ) {
           if (metadata.revision !== catalog.revision) {
             revisionRef.current = catalog.revision
-            setRevision(catalog.revision)
             setConflictCatalog({
               courses: catalog.courses,
               revision: catalog.revision,
@@ -109,7 +106,6 @@ export function useSharedCourses({
             controller.signal,
           )
           revisionRef.current = saved.revision
-          setRevision(saved.revision)
           lastSyncedRef.current = courseFingerprint(saved.courses)
           persistMetadata(ownerId, saved.revision, lastSyncedRef.current)
           setStatus('saved')
@@ -170,7 +166,6 @@ export function useSharedCourses({
           revisionRef.current,
         )
         revisionRef.current = saved.revision
-        setRevision(saved.revision)
         lastSyncedRef.current = courseFingerprint(saved.courses)
         persistMetadata(ownerId, saved.revision, lastSyncedRef.current)
         setStatus('saved')
@@ -179,7 +174,6 @@ export function useSharedCourses({
       } catch (error) {
         if (error instanceof SharedCourseConflictError) {
           revisionRef.current = error.current.revision
-          setRevision(error.current.revision)
           setConflictCatalog({
             courses: error.current.courses,
             revision: error.current.revision,
@@ -203,7 +197,6 @@ export function useSharedCourses({
   const reloadServerCatalog = useCallback(() => {
     if (!conflictCatalog || !ownerId) return
     revisionRef.current = conflictCatalog.revision
-    setRevision(conflictCatalog.revision)
     lastSyncedRef.current = courseFingerprint(conflictCatalog.courses)
     coursesRef.current = conflictCatalog.courses
     onChangeRef.current(conflictCatalog.courses)
@@ -217,16 +210,10 @@ export function useSharedCourses({
     setMessage('Shared courses reloaded')
   }, [conflictCatalog, ownerId])
 
-  const refreshCatalog = useCallback(() => {
-    setRetryToken((value) => value + 1)
-  }, [])
-
   return {
     status,
     message,
-    revision,
     reloadServerCatalog,
-    refreshCatalog,
   }
 }
 

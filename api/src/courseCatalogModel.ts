@@ -55,13 +55,6 @@ export function validateCourseCatalogPayload(
   }
 }
 
-export function validateCourseTemplate(value: unknown): unknown {
-  if (!isCourse(value)) {
-    throw new ValidationError('Course proposal contains an invalid course.')
-  }
-  return value
-}
-
 export function toCourseCatalogResponse(
   catalog: StoredCourseCatalog | null,
 ): CourseCatalogResponse {
