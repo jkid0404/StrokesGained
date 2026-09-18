@@ -53,7 +53,9 @@ export function useSharedCourses({
   }, [courses, onChange])
 
   useEffect(() => {
-    if (ownerId) saveSharedCourses(ownerId, courses)
+    if (canPersistSharedCourseCache(ownerId, initializedOwnerRef.current)) {
+      saveSharedCourses(ownerId, courses)
+    }
   }, [courses, ownerId])
 
   useEffect(() => {
@@ -219,6 +221,13 @@ export function useSharedCourses({
 
 function courseFingerprint(courses: CourseTemplate[]): string {
   return JSON.stringify(courses)
+}
+
+export function canPersistSharedCourseCache(
+  ownerId: string | null,
+  initializedOwnerId: string | null,
+): ownerId is string {
+  return ownerId !== null && initializedOwnerId === ownerId
 }
 
 function persistMetadata(
