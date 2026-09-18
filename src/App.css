@@ -17,6 +17,7 @@
 }
 
 .club-analytics-row {
+  --sticky-column-gutter: 22px;
   align-items: center;
   border-top: 1px solid var(--line);
   display: grid;
@@ -42,9 +43,10 @@
 .club-analytics-row > :first-child {
   background: var(--white);
   box-shadow:
+    calc(var(--sticky-column-gutter) * -1) 0 0 var(--white),
     14px 0 0 var(--white),
     20px 0 14px -16px rgba(21, 37, 29, 0.45);
-  left: 0;
+  left: var(--sticky-column-gutter);
   position: sticky;
   z-index: 1;
 }
@@ -52,6 +54,7 @@
 .club-analytics-row.table-header > :first-child {
   background: #f5f7f4;
   box-shadow:
+    calc(var(--sticky-column-gutter) * -1) 0 0 #f5f7f4,
     14px 0 0 #f5f7f4,
     20px 0 14px -16px rgba(21, 37, 29, 0.45);
   z-index: 2;
@@ -2317,6 +2320,7 @@ button:disabled {
   }
 
   .club-analytics-row {
+    --sticky-column-gutter: 12px;
     font-size: 12px;
     min-width: 570px;
     padding: 13px 12px;

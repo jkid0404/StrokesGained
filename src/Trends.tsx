@@ -31,7 +31,8 @@ const CATEGORY_LABELS: Record<ShotCategory, string> = {
   putting: 'Putting',
 }
 
-const WINDOW_OPTIONS = [5, 10, 20] as const
+const WINDOW_OPTIONS = [5, 10, 20, 'all'] as const
+type TrendWindow = (typeof WINDOW_OPTIONS)[number]
 type TrendMetricSelection =
   | `sg:${TrendCategory}`
   | `traditional:${TraditionalTrendMetric}`
@@ -63,7 +64,7 @@ export function Trends({
   clubs: string[]
   rounds: Round[]
 }) {
-  const [windowSize, setWindowSize] = useState<(typeof WINDOW_OPTIONS)[number]>(10)
+  const [windowSize, setWindowSize] = useState<TrendWindow>(10)
   const [courseName, setCourseName] = useState('')
   const [teeName, setTeeName] = useState('')
   const [fromDate, setFromDate] = useState('')
@@ -103,7 +104,16 @@ export function Trends({
       }),
     [courseName, fromDate, roundLength, rounds, teeName, toDate],
   )
-  const displayedRounds = filteredRounds.slice(-windowSize)
+  const displayedRounds =
+    windowSize === 'all' ? filteredRounds : filteredRounds.slice(-windowSize)
+  const windowContext =
+    windowSize === 'all'
+      ? `All ${displayedRounds.length} matching round${
+          displayedRounds.length === 1 ? '' : 's'
+        }`
+      : `Last ${displayedRounds.length} matching round${
+          displayedRounds.length === 1 ? '' : 's'
+        }`
   const strokesGainedSummary = buildStrokesGainedSummary(displayedRounds)
   const traditionalStats = calculateTraditionalStats(displayedRounds)
   const isStrokesGained = selectedMetric.startsWith('sg:')
@@ -172,7 +182,7 @@ export function Trends({
 
       <div className="card trend-controls">
         <div className="trend-window-control">
-          <span>Show last</span>
+          <span>Show rounds</span>
           <div className="segmented" aria-label="Number of rounds to chart">
             {WINDOW_OPTIONS.map((option) => (
               <button
@@ -181,7 +191,7 @@ export function Trends({
                 type="button"
                 onClick={() => setWindowSize(option)}
               >
-                {option}
+                {option === 'all' ? 'All' : option}
               </button>
             ))}
           </div>
@@ -315,16 +325,12 @@ export function Trends({
           />
 
           <StrokesGainedSummary
-            context={`Last ${displayedRounds.length} matching round${
-              displayedRounds.length === 1 ? '' : 's'
-            }`}
+            context={windowContext}
             summary={strokesGainedSummary}
           />
 
           <TraditionalStatsPanel
-            context={`Last ${displayedRounds.length} matching round${
-              displayedRounds.length === 1 ? '' : 's'
-            }`}
+            context={windowContext}
             stats={traditionalStats}
           />
 
@@ -503,7 +509,7 @@ function TrendChart({
   points: TrendPoint[]
   showPgaReference?: boolean
 }) {
-  const width = 840
+  const width = Math.max(840, points.length * 36 + 82)
   const height = 330
   const margin = { top: 28, right: 24, bottom: 58, left: 58 }
   const plotWidth = width - margin.left - margin.right
@@ -575,10 +581,11 @@ function TrendChart({
           aria-label={`${label} over ${points.length} rounds`}
           className="trend-chart"
           role="img"
+          style={{ minWidth: `${width}px` }}
           viewBox={`0 0 ${width} ${height}`}
         >
           <title>
-            {label} over the last {points.length} matching rounds
+            {label} over {points.length} matching rounds
           </title>
           {ticks.map((tick) => (
             <g key={tick}>
