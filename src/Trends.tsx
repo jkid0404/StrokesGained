@@ -357,6 +357,9 @@ export function Trends({
                   <div className="club-analytics-row" key={metric.key}>
                     <span>
                       <strong>{metric.club}</strong>
+                      {metric.distanceBand && (
+                        <small>{metric.distanceBand}</small>
+                      )}
                     </span>
                     <span>{metric.shots}</span>
                     <span>
