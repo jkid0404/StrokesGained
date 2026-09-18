@@ -44,6 +44,8 @@ export interface Round {
   id: string
   courseName: string
   teeName?: string
+  courseId?: string
+  teeId?: string
   playedOn: string
   createdAt: string
   status: 'draft' | 'complete'
@@ -57,10 +59,30 @@ export interface CourseTemplate {
   teeName: string
   holes: Record<number, Pick<Hole, 'par' | 'yardage'>>
   aliases?: string[]
+  courseId?: string
+  teeId?: string
+  revision?: number
 }
 
 export function courseKey(name: string, teeName = 'Unspecified tees'): string {
-  return `${name.trim().toLocaleLowerCase()}::${teeName.trim().toLocaleLowerCase()}`
+  return `${name.trim().toLocaleLowerCase('en-US')}::${teeName.trim().toLocaleLowerCase('en-US')}`
+}
+
+export function roundMatchesCourse(
+  round: Round,
+  course: CourseTemplate,
+): boolean {
+  if (round.courseId && round.teeId && course.courseId && course.teeId) {
+    return round.courseId === course.courseId && round.teeId === course.teeId
+  }
+  if (round.courseId || round.teeId) return false
+  const identities = new Set([course.key, ...(course.aliases ?? [])])
+  return identities.has(
+    courseKey(
+      round.courseName,
+      round.teeName?.trim() || 'Unspecified tees',
+    ),
+  )
 }
 
 export interface ShotResult {

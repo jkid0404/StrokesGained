@@ -5,7 +5,7 @@ import {
 import {
   calculateRound,
   calculateShot,
-  courseKey,
+  roundMatchesCourse,
   type CourseTemplate,
   type Hole,
   type Round,
@@ -62,16 +62,10 @@ export function buildCourseInsights(
   rounds: Round[],
   course: CourseTemplate,
 ): CourseInsights {
-  const matchingKeys = new Set([course.key, ...(course.aliases ?? [])])
   const matchingRounds = rounds.filter(
     (round) =>
       round.status === 'complete' &&
-      matchingKeys.has(
-        courseKey(
-          round.courseName,
-          round.teeName?.trim() || 'Unspecified tees',
-        ),
-      ),
+      roundMatchesCourse(round, course),
   )
   const holeGroups = new Map<number, HoleAccumulator>()
 

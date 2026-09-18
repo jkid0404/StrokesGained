@@ -15,8 +15,11 @@ export interface CourseProposal {
   proposerDetails: string
   type: 'create' | 'edit'
   status: CourseProposalStatus
-  targetCourseKey: string | null
-  baseCatalogRevision: number
+  targetCourseId: string | null
+  targetTeeId: string | null
+  baseCourseRevision: number
+  targetCourseKey?: string | null
+  baseCatalogRevision?: number
   baseCourse: CourseTemplate | null
   proposedCourse: CourseTemplate
   message: string
@@ -49,14 +52,16 @@ export async function fetchCourseProposals(
 }
 
 export async function submitCourseProposal({
-  targetCourseKey,
-  baseCatalogRevision,
+  targetCourseId,
+  targetTeeId,
+  baseCourseRevision,
   baseCourse,
   proposedCourse,
   message,
 }: {
-  targetCourseKey: string | null
-  baseCatalogRevision: number
+  targetCourseId: string | null
+  targetTeeId: string | null
+  baseCourseRevision: number
   baseCourse: CourseTemplate | null
   proposedCourse: CourseTemplate
   message: string
@@ -68,8 +73,9 @@ export async function submitCourseProposal({
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      targetCourseKey,
-      baseCatalogRevision,
+      targetCourseId,
+      targetTeeId,
+      baseCourseRevision,
       baseCourse,
       proposedCourse,
       message,

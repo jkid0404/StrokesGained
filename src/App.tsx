@@ -113,10 +113,13 @@ function App() {
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null)
   const [activeHoleIndex, setActiveHoleIndex] = useState(0)
   const [activeCourseKey, setActiveCourseKey] = useState<string | null>(null)
-  const [proposalTargetCourseKey, setProposalTargetCourseKey] = useState<
+  const [proposalTargetCourseId, setProposalTargetCourseId] = useState<
     string | null
   >(null)
-  const [proposalBaseCatalogRevision, setProposalBaseCatalogRevision] =
+  const [proposalTargetTeeId, setProposalTargetTeeId] = useState<string | null>(
+    null,
+  )
+  const [proposalBaseCourseRevision, setProposalBaseCourseRevision] =
     useState(0)
   const [proposalBaseCourse, setProposalBaseCourse] =
     useState<CourseTemplate | null>(null)
@@ -225,15 +228,35 @@ function App() {
     setView('entry')
   }
 
-  function updateCourseHole(courseName: string, teeName: string, hole: Hole) {
+  async function updateCourseHole(round: Round, hole: Hole) {
+    const courseName = round.courseName
+    const teeName = round.teeName ?? 'Unspecified tees'
     const key = courseKey(courseName, teeName)
     setDeletedCourseKeys((keys) => keys.filter((deletedKey) => deletedKey !== key))
-    const sharedCourse = sharedCourseCatalog.some((course) => course.key === key)
-    if (sharedCourse && !canManageSharedCourses) return
-    const setTargetCourses = sharedCourse
-      ? setSharedCourseCatalog
-      : setPersonalCourses
-    setTargetCourses((current) => {
+    const sharedCourse = sharedCourseCatalog.find(
+      (course) =>
+        (round.courseId &&
+          round.teeId &&
+          course.courseId === round.courseId &&
+          course.teeId === round.teeId) ||
+        (!round.courseId && !round.teeId && course.key === key),
+    )
+    if (sharedCourse) {
+      if (!canManageSharedCourses) {
+        throw new Error(
+          'Reload shared courses before changing shared hole details.',
+        )
+      }
+      await sharedCourses.updateCourse({
+        ...sharedCourse,
+        holes: {
+          ...sharedCourse.holes,
+          [hole.number]: { par: hole.par, yardage: hole.yardage },
+        },
+      })
+      return
+    }
+    setPersonalCourses((current) => {
       const existing = current.find((course) => course.key === key)
       const updated: CourseTemplate = {
         key,
@@ -245,20 +268,32 @@ function App() {
           [hole.number]: { par: hole.par, yardage: hole.yardage },
         },
       }
-      return [...current.filter((course) => course.key !== key), updated].sort((a, b) =>
-        a.name.localeCompare(b.name),
+      return [...current.filter((course) => course.key !== key), updated].sort(
+        (a, b) => a.name.localeCompare(b.name),
       )
     })
   }
 
-  function saveCourse(course: CourseTemplate, originalKey: string) {
-    const sharedCourse = sharedCourseCatalog.some(
+  async function saveCourse(course: CourseTemplate, originalKey: string) {
+    const sharedCourse = sharedCourseCatalog.find(
       (item) => item.key === originalKey,
     )
-    const setTargetCourses = sharedCourse && canManageSharedCourses
-      ? setSharedCourseCatalog
-      : setPersonalCourses
-    setTargetCourses((current) => {
+    if (sharedCourse) {
+      if (!canManageSharedCourses) {
+        throw new Error('Reload shared courses before editing this course.')
+      }
+      const saved = {
+        ...course,
+        courseId: sharedCourse.courseId,
+        teeId: sharedCourse.teeId,
+        revision: sharedCourse.revision,
+      }
+      await sharedCourses.updateCourse(saved)
+      setActiveCourseKey(saved.key)
+      setView('courses')
+      return
+    }
+    setPersonalCourses((current) => {
       const original = current.find((item) => item.key === originalKey)
       const aliases =
         course.key === originalKey
@@ -288,25 +323,26 @@ function App() {
     setView('courses')
   }
 
-  function shareCourse(course: CourseTemplate) {
-    if (!canManageSharedCourses) return
+  async function shareCourse(course: CourseTemplate) {
+    if (!canManageSharedCourses) {
+      throw new Error('Reload shared courses before publishing this course.')
+    }
     const confirmed = window.confirm(
       `Share ${course.name} — ${course.teeName} with every invited golfer?`,
     )
     if (!confirmed) return
-    setSharedCourseCatalog((current) => [
-      ...current.filter((item) => item.key !== course.key),
-      course,
-    ].sort(
-      (a, b) =>
-        a.name.localeCompare(b.name) || a.teeName.localeCompare(b.teeName),
-    ))
+    const existingCourse = sharedCourseCatalog.find(
+      (item) =>
+        item.name.trim().toLocaleLowerCase('en-US') ===
+        course.name.trim().toLocaleLowerCase('en-US'),
+    )
+    await sharedCourses.createCourse(course, existingCourse)
     setPersonalCourses((current) =>
       current.filter((item) => item.key !== course.key),
     )
   }
 
-  function deleteCourse(course: CourseTemplate) {
+  async function deleteCourse(course: CourseTemplate) {
     const confirmed = window.confirm(
       `Delete ${course.name} — ${course.teeName}? Historical rounds will not be changed.`,
     )
@@ -315,10 +351,11 @@ function App() {
     const isSharedCourse = sharedCourseCatalog.some(
       (item) => item.key === course.key,
     )
-    if (isSharedCourse && canManageSharedCourses) {
-      setSharedCourseCatalog((current) =>
-        current.filter((item) => item.key !== course.key),
-      )
+    if (isSharedCourse) {
+      if (!canManageSharedCourses) {
+        throw new Error('Reload shared courses before deleting this course.')
+      }
+      await sharedCourses.deleteCourse(course)
     } else {
       setPersonalCourses((current) =>
         current.filter((item) => item.key !== course.key),
@@ -522,15 +559,17 @@ function App() {
             }}
             onSubmit={(course) => {
               setActiveCourseKey(course.key)
-              setProposalTargetCourseKey(null)
-              setProposalBaseCatalogRevision(sharedCourses.revision)
+              setProposalTargetCourseId(null)
+              setProposalTargetTeeId(null)
+              setProposalBaseCourseRevision(0)
               setProposalBaseCourse(null)
               setView('course-proposal')
             }}
             onSuggest={(course) => {
               setActiveCourseKey(course.key)
-              setProposalTargetCourseKey(course.key)
-              setProposalBaseCatalogRevision(sharedCourses.revision)
+              setProposalTargetCourseId(course.courseId ?? null)
+              setProposalTargetTeeId(course.teeId ?? null)
+              setProposalBaseCourseRevision(course.revision ?? 0)
               setProposalBaseCourse(course)
               setView('course-proposal')
             }}
@@ -565,8 +604,9 @@ function App() {
             onCancel={() => setView('courses')}
             onSave={async (course, message) => {
               await submitCourseProposal({
-                targetCourseKey: proposalTargetCourseKey,
-                baseCatalogRevision: proposalBaseCatalogRevision,
+                targetCourseId: proposalTargetCourseId,
+                targetTeeId: proposalTargetTeeId,
+                baseCourseRevision: proposalBaseCourseRevision,
                 baseCourse: proposalBaseCourse,
                 proposedCourse: course,
                 message,
@@ -866,6 +906,12 @@ function RoundSetup({
       id: createId('round'),
       courseName: courseName.trim() || 'Unnamed course',
       teeName: teeName.trim() || 'Unspecified tees',
+      ...(selectedTemplate?.courseId && selectedTemplate.teeId
+        ? {
+            courseId: selectedTemplate.courseId,
+            teeId: selectedTemplate.teeId,
+          }
+        : {}),
       playedOn,
       createdAt: new Date().toISOString(),
       status: 'draft',
@@ -1002,7 +1048,7 @@ function RoundEntry({
   isCloudSynced: boolean
   onHoleChange: (index: number) => void
   onChange: (round: Round) => void
-  onHoleDetailsChange: (courseName: string, teeName: string, hole: Hole) => void
+  onHoleDetailsChange: (round: Round, hole: Hole) => Promise<void>
   onReview: () => void
 }) {
   const hole = round.holes[activeHoleIndex]
@@ -1191,7 +1237,7 @@ function RoundEntry({
     if (activeHoleIndex < round.holes.length - 1) onHoleChange(activeHoleIndex + 1)
   }
 
-  function saveHoleDetails(par: number, yardage: number) {
+  async function saveHoleDetails(par: number, yardage: number) {
     const updatedHoles = round.holes.map((item, index) =>
       index === activeHoleIndex
         ? {
@@ -1210,7 +1256,7 @@ function RoundEntry({
         : item,
     )
     onChange({ ...round, holes: updatedHoles })
-    onHoleDetailsChange(round.courseName, round.teeName ?? 'Unspecified tees', {
+    await onHoleDetailsChange(round, {
       ...hole,
       par,
       yardage,
@@ -1587,12 +1633,12 @@ function CourseLibrary({
   canManage: boolean
   courses: CourseTemplate[]
   onBack: () => void
-  onDelete: (course: CourseTemplate) => void
+  onDelete: (course: CourseTemplate) => Promise<void>
   onEdit: (course: CourseTemplate) => void
   onInsights: (course: CourseTemplate) => void
   onOpenSubmissions: () => void
   onReloadSharedCourses: () => void
-  onShare: (course: CourseTemplate) => void
+  onShare: (course: CourseTemplate) => Promise<void>
   onSubmit: (course: CourseTemplate) => void
   onSuggest: (course: CourseTemplate) => void
   isAdmin: boolean
@@ -1601,6 +1647,28 @@ function CourseLibrary({
   sharedStatus: string
   submissionsEnabled: boolean
 }) {
+  const [mutationError, setMutationError] = useState('')
+  const [activeMutation, setActiveMutation] = useState<string | null>(null)
+
+  async function mutate(
+    course: CourseTemplate,
+    action: 'share' | 'delete',
+  ): Promise<void> {
+    setActiveMutation(`${action}:${course.key}`)
+    setMutationError('')
+    try {
+      await (action === 'share' ? onShare(course) : onDelete(course))
+    } catch (error) {
+      setMutationError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to update the shared course.',
+      )
+    } finally {
+      setActiveMutation(null)
+    }
+  }
+
   return (
     <section className="page narrow">
       <button className="text-button" type="button" onClick={onBack}>
@@ -1639,6 +1707,7 @@ function CourseLibrary({
           </button>
         )}
       </div>
+      {mutationError && <div className="error-message">{mutationError}</div>}
       {courses.length === 0 ? (
         <div className="empty-state">
           <h3>No courses yet</h3>
@@ -1659,8 +1728,9 @@ function CourseLibrary({
                 {canManage && !sharedCourseKeys.includes(course.key) && (
                   <button
                     className="primary"
+                    disabled={activeMutation !== null}
                     type="button"
-                    onClick={() => onShare(course)}
+                    onClick={() => void mutate(course, 'share')}
                   >
                     Share course
                   </button>
@@ -1690,8 +1760,9 @@ function CourseLibrary({
                 {(canManage || !sharedCourseKeys.includes(course.key)) && (
                   <button
                     className="danger-button"
+                    disabled={activeMutation !== null}
                     type="button"
-                    onClick={() => onDelete(course)}
+                    onClick={() => void mutate(course, 'delete')}
                   >
                     Delete
                   </button>
@@ -2119,6 +2190,9 @@ function CourseEditor({
           name: trimmedName,
           teeName: trimmedTeeName,
           holes: savedHoles,
+          ...(course?.courseId ? { courseId: course.courseId } : {}),
+          ...(course?.teeId ? { teeId: course.teeId } : {}),
+          ...(course?.revision ? { revision: course.revision } : {}),
         },
         message.trim(),
       )
@@ -2236,16 +2310,30 @@ function HoleSetup({
 }: {
   hole: Hole
   onCancel?: () => void
-  onSave: (par: number, yardage: number) => void
+  onSave: (par: number, yardage: number) => void | Promise<void>
 }) {
   const [par, setPar] = useState(hole.par >= 3 ? hole.par : 4)
   const [yardage, setYardage] = useState(hole.yardage > 0 ? String(hole.yardage) : '400')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent) {
     event.preventDefault()
     const parsedYardage = Number(yardage)
     if (Number.isFinite(parsedYardage) && parsedYardage > 0) {
-      onSave(par, parsedYardage)
+      setSaving(true)
+      setError('')
+      try {
+        await onSave(par, parsedYardage)
+      } catch (saveError) {
+        setError(
+          saveError instanceof Error
+            ? saveError.message
+            : 'Unable to save hole details.',
+        )
+      } finally {
+        setSaving(false)
+      }
     }
   }
 
@@ -2279,10 +2367,11 @@ function HoleSetup({
               Cancel
             </button>
           )}
-          <button className="primary" type="submit">
+          <button className="primary" disabled={saving} type="submit">
             {onCancel ? 'Save hole details' : `Start hole ${hole.number}`}
           </button>
         </div>
+        {error && <div className="error-message">{error}</div>}
       </form>
     </div>
   )

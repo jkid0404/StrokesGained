@@ -6,8 +6,9 @@ import {
 } from '@azure/functions'
 import { authorizePrincipal } from '../auth.js'
 import {
-  applyApprovedProposal,
+  assertProposalCanUpdate,
   createCourseProposal,
+  proposalAlreadyApplied,
   ProposalConflictError,
   validateCreateCourseProposal,
   validateReviewAction,
@@ -21,12 +22,17 @@ import {
   updateProposalStatus,
 } from '../courseProposalStore.js'
 import {
-  validateCourseCatalogPayload,
-} from '../courseCatalogModel.js'
+  createPublishedCourse,
+  findPublishedTemplate,
+  findPublishedTemplateByIdentity,
+  listPublishedCourses,
+  updatePublishedTee,
+} from '../courseCatalogV2Store.js'
 import {
-  readCourseCatalog,
-  writeCourseCatalog,
-} from '../courseCatalogStore.js'
+  CourseConflictError,
+  CourseNotFoundError,
+  flattenCourseAggregate,
+} from '../courseCatalogV2Model.js'
 import {
   PayloadTooLargeError,
   ValidationError,
@@ -56,7 +62,9 @@ async function courseProposalsHandler(
 
     if (request.method === 'POST' && !id) {
       const payload = validateCreateCourseProposal(await request.json())
-      const catalog = await readCourseCatalog()
+      const catalog = (await listPublishedCourses()).flatMap(
+        flattenCourseAggregate,
+      )
       const proposal = createCourseProposal(
         payload,
         authorization.principal,
@@ -131,6 +139,12 @@ async function courseProposalsHandler(
     if (error instanceof ProposalConflictError) {
       return json(409, { error: error.message })
     }
+    if (
+      error instanceof CourseConflictError ||
+      error instanceof CourseNotFoundError
+    ) {
+      return json(409, { error: error.message })
+    }
     if (getStatusCode(error) === 409 || getStatusCode(error) === 412) {
       return json(409, { error: 'The proposal changed elsewhere.' })
     }
@@ -146,7 +160,7 @@ async function approveProposal(
   note: string,
 ): Promise<HttpResponseInit> {
   if (proposal.status !== 'approving') {
-    applyApprovedProposal(proposal, await readCourseCatalog())
+    await validateProposalApproval(proposal)
   }
   const claimedProposal =
     proposal.status === 'approving'
@@ -158,28 +172,12 @@ async function approveProposal(
           note || null,
         )
   try {
-    const catalog = await readCourseCatalog()
-    const courses = applyApprovedProposal(claimedProposal, catalog)
-    if (JSON.stringify(courses) !== JSON.stringify(catalog?.courses ?? [])) {
-      const payload = validateCourseCatalogPayload({
-        courses,
-        revision: catalog?.revision ?? 0,
-      })
-      const result = await writeCourseCatalog(payload)
-      if (result.conflict) {
-        await returnProposalForChanges(
-          claimedProposal,
-          reviewerId,
-          'The shared course catalog changed during approval. Review and retry.',
-        )
-        return json(409, {
-          error: 'The shared course catalog changed elsewhere.',
-        })
-      }
-    }
+    await applyProposalMutation(claimedProposal)
   } catch (error) {
     if (
       error instanceof ProposalConflictError ||
+      error instanceof CourseConflictError ||
+      error instanceof CourseNotFoundError ||
       error instanceof ValidationError ||
       error instanceof PayloadTooLargeError
     ) {
@@ -199,6 +197,87 @@ async function approveProposal(
       note || null,
     ),
   })
+}
+
+async function validateProposalApproval(
+  proposal: CourseProposal,
+): Promise<void> {
+  if (proposal.type === 'create') {
+    assertCreateProposalHasIds(proposal)
+    const existing = await findPublishedTemplate(
+      proposal.proposedCourse.courseId,
+      proposal.proposedCourse.teeId,
+    )
+    if (existing && !proposalAlreadyApplied(proposal, existing)) {
+      throw new ProposalConflictError(
+        'The proposed immutable course identity is already in use.',
+      )
+    }
+    return
+  }
+  const current = await findProposalTarget(proposal)
+  if (!proposalAlreadyApplied(proposal, current)) {
+    assertProposalCanUpdate(proposal, current)
+  }
+}
+
+async function applyProposalMutation(proposal: CourseProposal): Promise<void> {
+  const current = await findProposalTarget(proposal)
+  if (proposalAlreadyApplied(proposal, current)) return
+
+  if (proposal.type === 'create') {
+    assertCreateProposalHasIds(proposal)
+    await createPublishedCourse(
+      {
+        name: proposal.proposedCourse.name,
+        teeName: proposal.proposedCourse.teeName,
+        holes: proposal.proposedCourse.holes,
+      },
+      {
+        courseId: proposal.proposedCourse.courseId,
+        teeId: proposal.proposedCourse.teeId,
+      },
+    )
+    return
+  }
+
+  assertProposalCanUpdate(proposal, current)
+  await updatePublishedTee(
+    current.courseId,
+    current.teeId,
+    {
+      name: proposal.proposedCourse.name,
+      teeName: proposal.proposedCourse.teeName,
+      holes: proposal.proposedCourse.holes,
+      revision: current.revision,
+    },
+  )
+}
+
+async function findProposalTarget(
+  proposal: CourseProposal,
+) {
+  if (proposal.targetCourseId && proposal.targetTeeId) {
+    return findPublishedTemplate(
+      proposal.targetCourseId,
+      proposal.targetTeeId,
+    )
+  }
+  if (proposal.targetCourseKey) {
+    return findPublishedTemplateByIdentity(proposal.targetCourseKey)
+  }
+  return null
+}
+
+function assertCreateProposalHasIds(proposal: CourseProposal): void {
+  if (
+    !proposal.proposedCourse.courseId ||
+    !proposal.proposedCourse.teeId
+  ) {
+    throw new ProposalConflictError(
+      'This legacy new-course proposal must be resubmitted to receive immutable IDs.',
+    )
+  }
 }
 
 async function returnProposalForChanges(

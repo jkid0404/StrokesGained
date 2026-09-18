@@ -17,6 +17,9 @@ param containerName string = 'ownerState'
 @description('Shared course catalog Cosmos DB container name.')
 param coursesContainerName string = 'courses'
 
+@description('V2 per-course aggregate Cosmos DB container name.')
+param courseCatalogV2ContainerName string = 'courseCatalogV2'
+
 @description('Course publication proposal Cosmos DB container name.')
 param proposalsContainerName string = 'courseProposals'
 
@@ -97,6 +100,23 @@ resource coursesContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/co
   }
 }
 
+resource courseCatalogV2Container 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = {
+  parent: database
+  name: courseCatalogV2ContainerName
+  properties: {
+    resource: {
+      id: courseCatalogV2ContainerName
+      partitionKey: {
+        paths: [
+          '/courseId'
+        ]
+        kind: 'Hash'
+        version: 2
+      }
+    }
+  }
+}
+
 resource proposalsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = {
   parent: database
   name: proposalsContainerName
@@ -134,6 +154,7 @@ resource staticWebAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
     COSMOS_DATABASE_NAME: database.name
     COSMOS_CONTAINER_NAME: stateContainer.name
     COSMOS_COURSES_CONTAINER_NAME: coursesContainer.name
+    COSMOS_COURSE_CATALOG_V2_CONTAINER_NAME: courseCatalogV2Container.name
     COSMOS_PROPOSALS_CONTAINER_NAME: proposalsContainer.name
     ADMIN_USER_EMAIL: adminUserEmail
     ALLOWED_USER_EMAIL: adminUserEmail
@@ -144,6 +165,7 @@ output cosmosAccountName string = cosmosAccount.name
 output cosmosDatabaseName string = database.name
 output cosmosContainerName string = stateContainer.name
 output cosmosCoursesContainerName string = coursesContainer.name
+output cosmosCourseCatalogV2ContainerName string = courseCatalogV2Container.name
 output cosmosProposalsContainerName string = proposalsContainer.name
 output staticWebAppName string = staticWebApp.name
 output staticWebAppDefaultHostname string = staticWebApp.properties.defaultHostname

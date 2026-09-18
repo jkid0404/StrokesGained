@@ -137,6 +137,9 @@ function isRound(value: unknown): boolean {
     isShortString(value.id, 200) &&
     isShortString(value.courseName, 500) &&
     (value.teeName === undefined || isShortString(value.teeName, 500)) &&
+    ((value.courseId === undefined && value.teeId === undefined) ||
+      (isShortString(value.courseId, 200) &&
+        isShortString(value.teeId, 200))) &&
     isShortString(value.playedOn, 100) &&
     isShortString(value.createdAt, 100) &&
     (value.status === 'draft' || value.status === 'complete') &&
@@ -190,6 +193,11 @@ function isCourse(value: unknown): boolean {
     isShortString(value.key, 1_000) &&
     isShortString(value.name, 500) &&
     isShortString(value.teeName, 500) &&
+    ((value.courseId === undefined && value.teeId === undefined) ||
+      (isShortString(value.courseId, 200) &&
+        isShortString(value.teeId, 200))) &&
+    (value.revision === undefined ||
+      (Number.isSafeInteger(value.revision) && (value.revision as number) > 0)) &&
     (value.aliases === undefined ||
       (Array.isArray(value.aliases) &&
         value.aliases.length <= 100 &&

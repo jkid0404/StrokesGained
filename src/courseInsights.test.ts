@@ -106,6 +106,29 @@ describe('course and hole insights', () => {
 
     expect(buildCourseInsights([historicalRound], renamedCourse).rounds).toBe(1)
   })
+
+  it('prefers immutable IDs over renamed display values', () => {
+    const identifiedCourse: CourseTemplate = {
+      ...course,
+      name: 'Renamed Alpha',
+      teeName: 'Gold',
+      key: courseKey('Renamed Alpha', 'Gold'),
+      courseId: 'course-1',
+      teeId: 'tee-1',
+      revision: 4,
+    }
+    const identifiedRound: Round = {
+      ...makeRound('identified', 'Old display name', 'Old tee', '2026-01-01', [
+        makeHole(1, 4, 'fairway'),
+      ]),
+      courseId: 'course-1',
+      teeId: 'tee-1',
+    }
+
+    expect(buildCourseInsights([identifiedRound], identifiedCourse).rounds).toBe(
+      1,
+    )
+  })
 })
 
 function makeRound(

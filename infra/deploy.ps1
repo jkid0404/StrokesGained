@@ -48,6 +48,7 @@ $hostname = $outputs.staticWebAppDefaultHostname.value
 
 Write-Host ''
 Write-Host 'Infrastructure and application settings are ready.'
+Write-Host 'The legacy courses container is retained; courseCatalogV2 migrates lazily on first read when empty.'
 Write-Host "Static Web App: https://$hostname"
 Write-Host "Next: retrieve the deployment token with:"
 Write-Host "  az staticwebapp secrets list --name $staticWebAppName --resource-group $ResourceGroupName --query properties.apiKey -o tsv"

@@ -34,14 +34,19 @@ When hosted on Azure Static Web Apps, the app adds private cross-device sync:
 - Static Web Apps invitation roles (`golfer` and `admin`) for Microsoft-account
   access. The configured bootstrap administrator can manage the app before
   accepting the formal role invitation.
-- A separate shared Cosmos course catalog. All invited golfers can read shared
-  scorecards, while only administrators can change them. Rounds, shots, trends,
-  and course insights remain private to each owner.
+- A separate V2 shared Cosmos course catalog with one aggregate document per
+  course, partitioned by immutable `courseId`. Embedded tees have immutable
+  `teeId` values, so course and tee renames do not break round matching. All
+  invited golfers can read shared scorecards, while only administrators can
+  change them. Rounds, shots, trends, and course insights remain private to
+  each owner.
 - A moderated course-publication queue. Golfers can submit personal courses or
   suggest edits to shared scorecards; administrators review the course diff
   before approval changes the shared catalog.
-- Revision-based optimistic concurrency. Conflicts are shown in the UI and are
-  never silently overwritten.
+- Per-course revision and ETag optimistic concurrency. Administrator changes
+  create, update, or archive one course/tee aggregate; the browser never writes
+  the entire shared catalog. Conflicts are shown in the UI and are never
+  silently overwritten.
 
 The API derives `ownerId` only from the trusted `x-ms-client-principal` header.
 It accepts only Microsoft identities with the `golfer` or `admin` role. The
@@ -104,16 +109,34 @@ The private cloud document contains `rounds`, personal `courses`,
 `deletedCourseKeys`,
 `revision`, `updatedAt`, and the server-derived `ownerId`.
 
-Shared course definitions are stored separately in the `courses` Cosmos
-container. The shared catalog is cached per account for offline use and uses its
-own revision-based conflict protection. Personal course templates remain
-available for ad-hoc rounds; matching shared definitions take precedence.
+Shared course definitions are stored in the `courseCatalogV2` Cosmos container
+with partition key `/courseId`. `GET /api/courses` continues to return the
+flattened course-template shape used by the client, augmented with `courseId`,
+`teeId`, and the aggregate's `revision`. The shared catalog is cached per
+account for offline reads. Cache writes begin only after that account's cache or
+server response has initialized; the initial empty React state cannot erase a
+populated cache. Personal course templates remain owner-scoped and available
+for ad-hoc rounds; matching shared definitions take precedence.
+
+The legacy `courses` container and `COSMOS_COURSES_CONTAINER_NAME` setting are
+retained for rollback. When V2 has no documents, the API reads the untouched
+legacy `courses/catalog` document and creates deterministic course and tee IDs.
+Migration uses create-only writes, so concurrent first requests converge. Once
+any V2 document exists, V2 is authoritative and the legacy document is not
+modified.
+
+New rounds selected from a shared template store `courseId` and `teeId` in
+addition to the display names. Insights prefer those IDs and fall back to
+normalized keys and aliases for historical rounds. Existing owner documents
+are not rewritten.
 
 Course submissions are stored in the `courseProposals` container partitioned by
-the server-derived proposer ID. Golfers can list and withdraw their own pending
-submissions. Administrators can review all submissions, approve them into the
-shared catalog, reject them, or request changes. Approval verifies that the
-target shared course has not changed since the proposal was submitted.
+the server-derived proposer ID. New submissions target immutable course/tee IDs
+and a per-course revision/snapshot. New-course submissions receive their IDs at
+submission so approval retries are idempotent. Administrators approve through
+the same item-level V2 mutation service used by direct edits. Legacy proposals
+are resolved safely when possible and otherwise return a conflict requesting
+resubmission rather than writing ambiguous data.
 
 ## Azure deployment
 
@@ -136,6 +159,7 @@ without returning the Cosmos credential to the caller:
 - `COSMOS_DATABASE_NAME`
 - `COSMOS_CONTAINER_NAME`
 - `COSMOS_COURSES_CONTAINER_NAME`
+- `COSMOS_COURSE_CATALOG_V2_CONTAINER_NAME`
 - `COSMOS_PROPOSALS_CONTAINER_NAME`
 - `ADMIN_USER_EMAIL`
 
@@ -192,6 +216,8 @@ npm run lint
 npm run build
 npm test --prefix api
 npm run build --prefix api
+az bicep build --file infra\main.bicep --stdout
+git diff --check
 ```
 
 ## Benchmark source and limitations

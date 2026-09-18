@@ -1,26 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import {
-  applyApprovedProposal,
+  assertProposalCanUpdate,
   createCourseProposal,
+  proposalAlreadyApplied,
+  proposalExpectedTemplate,
   ProposalConflictError,
   validateCreateCourseProposal,
 } from './courseProposalModel.js'
-import type { StoredCourseCatalog } from './courseCatalogModel.js'
+import type { PublishedCourseTemplate } from './courseCatalogV2Model.js'
 
-const course = {
+const course: PublishedCourseTemplate = {
   key: 'alpha::blue',
   name: 'Alpha',
   teeName: 'Blue',
   holes: { 1: { par: 4, yardage: 400 } },
+  courseId: 'course-11111111-1111-5111-8111-111111111111',
+  teeId: 'tee-22222222-2222-5222-8222-222222222222',
+  revision: 3,
 }
 
 describe('course proposal model', () => {
-  it('creates an edit proposal from the current shared course', () => {
-    const catalog = makeCatalog([course])
+  it('creates an immutable-ID edit proposal from the current shared course', () => {
     const proposal = createCourseProposal(
       validateCreateCourseProposal({
-        targetCourseKey: course.key,
-        baseCatalogRevision: 3,
+        targetCourseId: course.courseId,
+        targetTeeId: course.teeId,
+        baseCourseRevision: course.revision,
         baseCourse: course,
         proposedCourse: {
           ...course,
@@ -29,20 +34,54 @@ describe('course proposal model', () => {
         message: 'Corrected hole one.',
       }),
       { userId: 'owner', userDetails: 'golfer@example.com' },
-      catalog,
+      [course],
     )
 
-    expect(proposal.type).toBe('edit')
-    expect(proposal.baseCourse).toEqual(course)
-    expect(proposal.baseCatalogRevision).toBe(3)
+    expect(proposal).toMatchObject({
+      type: 'edit',
+      targetCourseId: course.courseId,
+      targetTeeId: course.teeId,
+      baseCourseRevision: 3,
+    })
+    expect(proposal.proposedCourse.courseId).toBe(course.courseId)
+    expect(proposal.proposedCourse.teeId).toBe(course.teeId)
   })
 
-  it('applies a valid edit and preserves the old key as an alias', () => {
-    const catalog = makeCatalog([course])
+  it('assigns immutable IDs to new-course proposals for idempotent approval', () => {
     const proposal = createCourseProposal(
-      {
-        targetCourseKey: course.key,
-        baseCatalogRevision: 3,
+      validateCreateCourseProposal({
+        targetCourseId: null,
+        targetTeeId: null,
+        baseCourseRevision: 0,
+        baseCourse: null,
+        proposedCourse: {
+          key: 'alpha::blue',
+          name: 'Alpha',
+          teeName: 'Blue',
+          holes: {},
+        },
+        message: '',
+      }),
+      { userId: 'owner', userDetails: 'golfer@example.com' },
+      [],
+    )
+
+    expect(proposal.proposedCourse.courseId).toMatch(/^course-/)
+    expect(proposal.proposedCourse.teeId).toMatch(/^tee-/)
+    expect(
+      proposalAlreadyApplied(proposal, {
+        ...proposal.proposedCourse,
+        revision: 1,
+      }),
+    ).toBe(true)
+  })
+
+  it('preserves hidden aliases when an approved edit renames a tee', () => {
+    const proposal = createCourseProposal(
+      validateCreateCourseProposal({
+        targetCourseId: course.courseId,
+        targetTeeId: course.teeId,
+        baseCourseRevision: course.revision,
         baseCourse: course,
         proposedCourse: {
           ...course,
@@ -50,165 +89,153 @@ describe('course proposal model', () => {
           teeName: 'Gold',
         },
         message: '',
-      },
+      }),
       { userId: 'owner', userDetails: 'golfer@example.com' },
-      catalog,
+      [course],
     )
 
-    expect(applyApprovedProposal(proposal, catalog)).toEqual([
-      expect.objectContaining({
-        key: 'alpha::gold',
-        aliases: ['alpha::blue'],
-      }),
+    expect(proposal.proposedCourse.aliases).toBeUndefined()
+    expect(proposalExpectedTemplate(proposal).aliases).toEqual([
+      'alpha::blue',
     ])
   })
 
-  it('rejects stale edits instead of overwriting newer catalog data', () => {
-    const originalCatalog = makeCatalog([course])
+  it('rejects stale edits instead of overwriting newer course data', () => {
     const proposal = createCourseProposal(
-      {
-        targetCourseKey: course.key,
-        baseCatalogRevision: 3,
+      validateCreateCourseProposal({
+        targetCourseId: course.courseId,
+        targetTeeId: course.teeId,
+        baseCourseRevision: course.revision,
         baseCourse: course,
         proposedCourse: {
           ...course,
           holes: { 1: { par: 4, yardage: 410 } },
         },
         message: '',
-      },
+      }),
       { userId: 'owner', userDetails: 'golfer@example.com' },
-      originalCatalog,
+      [course],
     )
-    const changedCatalog = makeCatalog([
-      { ...course, holes: { 1: { par: 5, yardage: 400 } } },
-    ])
-
-    expect(() => applyApprovedProposal(proposal, changedCatalog)).toThrow(
-      ProposalConflictError,
-    )
-  })
-
-  it('recognizes a renamed edit as already applied after aliases are added', () => {
-    const catalog = makeCatalog([course])
-    const proposal = createCourseProposal(
-      {
-        targetCourseKey: course.key,
-        baseCatalogRevision: 3,
-        baseCourse: course,
-        proposedCourse: {
-          ...course,
-          key: 'alpha::gold',
-          teeName: 'Gold',
-        },
-        message: '',
-      },
-      { userId: 'owner', userDetails: 'golfer@example.com' },
-      catalog,
-    )
-    const appliedCatalog = makeCatalog([
-      {
-        ...(proposal.proposedCourse as object),
-        aliases: ['alpha::blue'],
-      },
-    ])
-
-    expect(applyApprovedProposal(proposal, appliedCatalog)).toEqual(
-      appliedCatalog.courses,
-    )
-  })
-
-  it('rejects an edit prepared from an older shared-course snapshot', () => {
-    const changedCourse = {
-      ...course,
-      holes: { 1: { par: 5, yardage: 400 } },
-    }
 
     expect(() =>
+      assertProposalCanUpdate(proposal, {
+        ...course,
+        revision: 4,
+        holes: { 1: { par: 5, yardage: 400 } },
+      }),
+    ).toThrow(ProposalConflictError)
+  })
+
+  it('rejects a stale snapshot at submission', () => {
+    expect(() =>
       createCourseProposal(
-        {
-          targetCourseKey: course.key,
-          baseCatalogRevision: 2,
-          baseCourse: course,
-          proposedCourse: {
+        validateCreateCourseProposal({
+          targetCourseId: course.courseId,
+          targetTeeId: course.teeId,
+          baseCourseRevision: course.revision,
+          baseCourse: {
             ...course,
-            holes: { 1: { par: 4, yardage: 410 } },
+            holes: { 1: { par: 5, yardage: 400 } },
           },
+          proposedCourse: course,
           message: '',
-        },
+        }),
         { userId: 'owner', userDetails: 'golfer@example.com' },
-        makeCatalog([changedCourse]),
+        [course],
       ),
     ).toThrow(ProposalConflictError)
   })
 
-  it('rejects a course key that does not match its name and tee', () => {
-    expect(() =>
-      createCourseProposal(
-        {
-          targetCourseKey: null,
-          baseCatalogRevision: 3,
-          baseCourse: null,
-          proposedCourse: { ...course, key: 'malicious-key' },
-          message: '',
-        },
-        { userId: 'owner', userDetails: 'golfer@example.com' },
-        makeCatalog([]),
-      ),
-    ).toThrow('Course key must match')
-  })
-
-  it('removes golfer-supplied aliases from proposals', () => {
+  it('supports safe legacy targeting at submission', () => {
     const proposal = createCourseProposal(
-      {
-        targetCourseKey: null,
-        baseCatalogRevision: 3,
-        baseCourse: null,
+      validateCreateCourseProposal({
+        targetCourseKey: course.key,
+        baseCatalogRevision: 2,
+        baseCourse: {
+          key: course.key,
+          name: course.name,
+          teeName: course.teeName,
+          holes: course.holes,
+        },
         proposedCourse: {
           ...course,
-          aliases: ['another-course::blue'],
+          holes: { 1: { par: 4, yardage: 410 } },
         },
         message: '',
-      },
+      }),
       { userId: 'owner', userDetails: 'golfer@example.com' },
-      makeCatalog([]),
+      [course],
     )
 
-    expect(proposal.proposedCourse).toEqual(course)
+    expect(proposal.targetCourseId).toBe(course.courseId)
+    expect(proposal.targetTeeId).toBe(course.teeId)
   })
 
-  it('does not treat a rename as applied while the source still exists', () => {
-    const catalog = makeCatalog([course])
+  it('accepts a uniquely resolved legacy edit whose snapshot still matches', () => {
     const proposal = createCourseProposal(
-      {
-        targetCourseKey: course.key,
-        baseCatalogRevision: 3,
+      validateCreateCourseProposal({
+        targetCourseId: course.courseId,
+        targetTeeId: course.teeId,
+        baseCourseRevision: course.revision,
         baseCourse: course,
         proposedCourse: {
           ...course,
-          key: 'alpha::gold',
-          teeName: 'Gold',
+          holes: { 1: { par: 4, yardage: 410 } },
         },
         message: '',
-      },
+      }),
       { userId: 'owner', userDetails: 'golfer@example.com' },
-      catalog,
+      [course],
     )
-    const destination = {
-      ...(proposal.proposedCourse as object),
-      aliases: ['alpha::blue'],
+    const legacyProposal = {
+      ...proposal,
+      targetCourseId: null,
+      targetTeeId: null,
+      targetCourseKey: course.key,
+      baseCourse: {
+        key: course.key,
+        name: course.name,
+        teeName: course.teeName,
+        holes: course.holes,
+      },
     }
 
     expect(() =>
-      applyApprovedProposal(proposal, makeCatalog([course, destination])),
-    ).toThrow('proposed name and tee')
+      assertProposalCanUpdate(legacyProposal, course),
+    ).not.toThrow()
+  })
+
+  it('rejects malformed keys and strips golfer-controlled aliases', () => {
+    expect(() =>
+      createCourseProposal(
+        validateCreateCourseProposal({
+          targetCourseId: null,
+          targetTeeId: null,
+          baseCourseRevision: 0,
+          baseCourse: null,
+          proposedCourse: { ...course, key: 'malicious-key' },
+          message: '',
+        }),
+        { userId: 'owner', userDetails: 'golfer@example.com' },
+        [],
+      ),
+    ).toThrow('Course key must match')
+
+    const proposal = createCourseProposal(
+      validateCreateCourseProposal({
+        targetCourseId: null,
+        targetTeeId: null,
+        baseCourseRevision: 0,
+        baseCourse: null,
+        proposedCourse: {
+          ...course,
+          aliases: ['hidden::identity'],
+        },
+        message: '',
+      }),
+      { userId: 'owner', userDetails: 'golfer@example.com' },
+      [],
+    )
+    expect(proposal.proposedCourse.aliases).toBeUndefined()
   })
 })
-
-function makeCatalog(courses: unknown[]): StoredCourseCatalog {
-  return {
-    id: 'catalog',
-    courses,
-    revision: 3,
-    updatedAt: '2026-09-17T00:00:00Z',
-  }
-}

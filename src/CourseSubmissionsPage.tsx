@@ -149,7 +149,10 @@ export function CourseSubmissionsPage({
                 {isAdmin && <span>Submitted by {proposal.proposerDetails}</span>}
                 <span>{formatDateTime(proposal.submittedAt)}</span>
                 <span>
-                  Based on catalog revision {proposal.baseCatalogRevision}
+                  Based on{' '}
+                  {proposal.baseCourseRevision === undefined
+                    ? `legacy catalog revision ${proposal.baseCatalogRevision ?? 0}`
+                    : `course revision ${proposal.baseCourseRevision}`}
                 </span>
               </div>
               {proposal.message && (
