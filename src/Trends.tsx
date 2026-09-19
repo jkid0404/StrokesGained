@@ -333,6 +333,7 @@ export function Trends({
           <TraditionalStatsPanel
             averagesOnly
             showContextPill={false}
+            showHeading={false}
             stats={traditionalStats}
           />
 

@@ -1797,7 +1797,7 @@ textarea:focus {
 }
 
 .shot-description .shot-category {
-  color: var(--green);
+  color: var(--ink);
   font-weight: 800;
 }
 
@@ -2009,9 +2009,9 @@ textarea:focus {
   align-items: center;
   border-top: 1px solid var(--line);
   display: grid;
-  gap: 14px;
-  grid-template-columns: 60px repeat(3, minmax(70px, 1fr)) 60px;
-  padding: 14px 20px;
+  gap: 8px;
+  grid-template-columns: 40px 36px 44px 60px 40px;
+  padding: 10px 14px;
 }
 
 .round-review-row:first-child {
@@ -2478,8 +2478,8 @@ button:disabled {
 
   .round-review-row {
     font-size: 12px;
-    min-width: 580px;
-    padding: 13px 12px;
+    min-width: 280px;
+    padding: 10px 8px;
   }
 
   .review-actions {
