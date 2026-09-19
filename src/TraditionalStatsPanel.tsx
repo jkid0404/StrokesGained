@@ -2,12 +2,10 @@ import type { TraditionalStats } from './traditionalStats'
 
 export function TraditionalStatsPanel({
   stats,
-  context,
   averagesOnly = false,
   showContextPill = true,
 }: {
   stats: TraditionalStats
-  context: string
   averagesOnly?: boolean
   showContextPill?: boolean
 }) {
@@ -27,7 +25,6 @@ export function TraditionalStatsPanel({
       <div className="section-heading compact-heading">
         <div>
           <span className="eyebrow">Traditional statistics</span>
-          <h2>{context}</h2>
         </div>
         {showContextPill && (
           <span className="pill">

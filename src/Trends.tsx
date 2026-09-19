@@ -332,7 +332,6 @@ export function Trends({
 
           <TraditionalStatsPanel
             averagesOnly
-            context={windowContext}
             showContextPill={false}
             stats={traditionalStats}
           />
