@@ -353,7 +353,6 @@ export function Trends({
                 <div className="club-analytics-row table-header">
                   <span>Club</span>
                   <span>Shots</span>
-                  <span>Avg start</span>
                   <span>SG / shot</span>
                 </div>
                 {clubMetrics.map((metric) => (
@@ -365,13 +364,6 @@ export function Trends({
                       )}
                     </span>
                     <span>{metric.shots}</span>
-                    <span>
-                      {metric.averageDistance === null || metric.distanceUnit === null
-                        ? 'N/A'
-                        : `${metric.averageDistance.toFixed(0)} ${
-                            metric.distanceUnit === 'feet' ? 'ft' : 'yd'
-                          }`}
-                    </span>
                     <strong
                       className={
                         metric.averageStrokesGained === null

@@ -22,7 +22,7 @@
   border-top: 1px solid var(--line);
   display: grid;
   gap: 14px;
-  grid-template-columns: 140px repeat(3, minmax(90px, 1fr));
+  grid-template-columns: 140px repeat(2, minmax(90px, 1fr));
   padding: 15px 22px;
 }
 
@@ -2462,24 +2462,37 @@ button:disabled {
   }
 
   .club-analytics-table {
-    overflow-x: auto;
+    overflow: hidden;
   }
 
   .club-analytics-row {
     --sticky-column-gutter: 12px;
     font-size: 12px;
-    min-width: 570px;
+    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
     padding: 13px 12px;
+    width: 100%;
+  }
+
+  .club-analytics-row > :not(:first-child) {
+    justify-self: center;
   }
 
   .round-review-card {
-    overflow-x: auto;
+    overflow: hidden;
   }
 
   .round-review-row {
     font-size: 12px;
-    min-width: 280px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    min-width: 0;
     padding: 10px 8px;
+    width: 100%;
+  }
+
+  .round-review-row > * {
+    justify-self: center;
   }
 
   .review-actions {
