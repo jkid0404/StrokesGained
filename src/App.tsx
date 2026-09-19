@@ -93,6 +93,31 @@ function App() {
       loadDeletedCourseKeys(),
     ),
   )
+
+  useEffect(() => {
+    const blurEditableControl = () => {
+      const activeElement = document.activeElement
+      if (
+        activeElement instanceof HTMLInputElement ||
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLSelectElement ||
+        (activeElement instanceof HTMLElement &&
+          activeElement.isContentEditable)
+      ) {
+        activeElement.blur()
+      }
+    }
+    const blurWhenHidden = () => {
+      if (document.hidden) blurEditableControl()
+    }
+
+    document.addEventListener('visibilitychange', blurWhenHidden)
+    window.addEventListener('pagehide', blurEditableControl)
+    return () => {
+      document.removeEventListener('visibilitychange', blurWhenHidden)
+      window.removeEventListener('pagehide', blurEditableControl)
+    }
+  }, [])
   const [sharedCourseCatalog, setSharedCourseCatalog] = useState<
     CourseTemplate[]
   >([])
@@ -2460,7 +2485,6 @@ function HoleSetup({
         <label>
           Yardage
           <input
-            autoFocus
             inputMode="numeric"
             min="1"
             required
