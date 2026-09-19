@@ -18,6 +18,7 @@ import {
   defaultHoleYardage,
   excludeDeletedCourseTemplates,
   formatMetric,
+  holeStrokeExpectations,
   mergeCourseTemplates,
   type CourseTemplate,
   type Hole,
@@ -487,6 +488,7 @@ function App() {
           <RoundEntry
             key={activeRound.id}
             round={activeRound}
+            allRounds={rounds}
             clubs={clubs}
             activeHoleIndex={Math.max(0, activeHoleIndex)}
             isCloudSynced={
@@ -1021,6 +1023,7 @@ function RoundSetup({
 
 function RoundEntry({
   round,
+  allRounds,
   clubs,
   activeHoleIndex,
   isCloudSynced,
@@ -1030,6 +1033,7 @@ function RoundEntry({
   onReview,
 }: {
   round: Round
+  allRounds: Round[]
   clubs: string[]
   activeHoleIndex: number
   isCloudSynced: boolean
@@ -1074,6 +1078,16 @@ function RoundEntry({
     calculateShot(shot, index, hole.par),
   )
   const holeStrokesGained = calculateHoleStrokesGained(hole)
+  const personalBaseline = buildPersonalBaseline(allRounds, round)
+  let expectedHoleStrokes: ReturnType<typeof holeStrokeExpectations> | null = null
+  try {
+    expectedHoleStrokes = holeStrokeExpectations(
+      hole.yardage,
+      personalBaseline.averageSgPer18,
+    )
+  } catch {
+    expectedHoleStrokes = null
+  }
 
   useEffect(() => {
     const nextFinishLie = defaultFinishLie(
@@ -1353,9 +1367,42 @@ function RoundEntry({
       <div className="entry-layout">
         <div>
           <div className="hole-summary card">
-            <span>Par {hole.par}</span>
-            <strong>{hole.yardage} yd</strong>
-            <span>{hole.shots.length} shot{hole.shots.length === 1 ? '' : 's'} entered</span>
+            <div className="hole-summary-details">
+              <span>Par {hole.par}</span>
+              <strong>{hole.yardage} yd</strong>
+              <span>
+                {hole.shots.length} shot{hole.shots.length === 1 ? '' : 's'} entered
+              </span>
+            </div>
+            <div className="hole-expectations" aria-label="Expected strokes for this hole">
+              <span>
+                <small>PGA Tour expected</small>
+                <strong>
+                  {expectedHoleStrokes
+                    ? expectedHoleStrokes.pgaTour.toFixed(2)
+                    : 'N/A'}
+                </strong>
+              </span>
+              <span>
+                <small>Your expected</small>
+                <strong>
+                  {expectedHoleStrokes?.personal !== null &&
+                  expectedHoleStrokes?.personal !== undefined
+                    ? expectedHoleStrokes.personal.toFixed(2)
+                    : 'N/A'}
+                </strong>
+                {personalBaseline.averageSgPer18 === null && (
+                  <small>
+                    {Math.max(0, 5 - personalBaseline.includedRounds)} more prior
+                    round
+                    {Math.max(0, 5 - personalBaseline.includedRounds) === 1
+                      ? ''
+                      : 's'}{' '}
+                    needed
+                  </small>
+                )}
+              </span>
+            </div>
             <button
               className="edit-hole-button"
               type="button"
@@ -1385,6 +1432,9 @@ function RoundEntry({
                             ? ` ${shot.finish.distance}${shot.finish.unit === 'feet' ? ' ft' : ' yd'}`
                             : ''}
                           {shot.penaltyStrokes ? ` · +${shot.penaltyStrokes} penalty` : ''}
+                        </small>
+                        <small className="shot-category">
+                          {CATEGORY_LABELS[result.category]}
                         </small>
                         {(shot.club || shot.note) && (
                           <small className="shot-metadata">

@@ -14,6 +14,7 @@ import {
   defaultHoleYardage,
   expectedStrokes,
   excludeDeletedCourseTemplates,
+  holeStrokeExpectations,
   mergeCourseTemplates,
   type Round,
   type Shot,
@@ -166,6 +167,17 @@ describe('default hole yardage', () => {
     expect(defaultHoleYardage(3)).toBe(150)
     expect(defaultHoleYardage(4)).toBe(400)
     expect(defaultHoleYardage(5)).toBe(500)
+  })
+})
+
+describe('hole stroke expectations', () => {
+  it('adjusts the PGA expectation by the personal SG average per hole', () => {
+    const pgaOnly = holeStrokeExpectations(400, null)
+    const personal = holeStrokeExpectations(400, -9)
+
+    expect(pgaOnly.personal).toBeNull()
+    expect(personal.pgaTour).toBeCloseTo(pgaOnly.pgaTour)
+    expect(personal.personal).toBeCloseTo(pgaOnly.pgaTour + 0.5)
   })
 })
 

@@ -1662,8 +1662,41 @@ textarea:focus {
   padding: 20px 22px;
 }
 
-.hole-summary span {
+.hole-summary-details {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+}
+
+.hole-summary span,
+.hole-summary small {
   color: var(--muted);
+}
+
+.hole-expectations {
+  display: flex;
+  gap: 22px;
+  margin-left: auto;
+}
+
+.hole-expectations > span {
+  display: grid;
+  gap: 2px;
+}
+
+.hole-expectations small,
+.hole-expectations strong {
+  display: block;
+}
+
+.hole-expectations small {
+  font-size: 11px;
+}
+
+.hole-expectations strong {
+  color: var(--ink);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 22px;
 }
 
 .edit-hole-button {
@@ -1728,6 +1761,11 @@ textarea:focus {
 .shot-description .shot-metadata {
   color: var(--green-dark);
   font-weight: 700;
+}
+
+.shot-description .shot-category {
+  color: var(--green);
+  font-weight: 800;
 }
 
 .hole-sg-total {
@@ -2156,6 +2194,16 @@ button:disabled {
   .hole-summary {
     align-items: flex-start;
     flex-wrap: wrap;
+  }
+
+  .hole-summary-details {
+    flex-wrap: wrap;
+  }
+
+  .hole-expectations {
+    margin-left: 0;
+    order: 3;
+    width: 100%;
   }
 
   .edit-hole-button {

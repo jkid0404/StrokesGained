@@ -120,6 +120,11 @@ export interface PersonalBaseline {
   categoryPerShot: Partial<Record<ShotCategory, number>>
 }
 
+export interface HoleStrokeExpectations {
+  pgaTour: number
+  personal: number | null
+}
+
 export interface CumulativeMetrics {
   versusPgaTour: number | null
   versusPersonalAverage: number | null
@@ -315,6 +320,22 @@ export function defaultHoleYardage(par: number): number {
   if (par === 3) return 150
   if (par === 5) return 500
   return 400
+}
+
+export function holeStrokeExpectations(
+  yardage: number,
+  averageSgPer18: number | null,
+): HoleStrokeExpectations {
+  const pgaTour = expectedStrokes({
+    lie: 'tee',
+    distance: yardage,
+    unit: 'yards',
+  })
+  return {
+    pgaTour,
+    personal:
+      averageSgPer18 === null ? null : pgaTour - averageSgPer18 / 18,
+  }
 }
 
 export function calculateShot(shot: Shot, shotIndex: number, par: number): ShotResult {
