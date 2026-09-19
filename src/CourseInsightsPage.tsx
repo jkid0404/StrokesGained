@@ -74,6 +74,7 @@ export function CourseInsightsPage({
           />
 
           <TraditionalStatsPanel
+            averagesOnly
             showHeading={false}
             stats={insights.traditionalStats}
           />
