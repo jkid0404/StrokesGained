@@ -148,6 +148,7 @@ export const CLUB_OPTIONS = [
   'Pitching wedge',
   'Gap wedge',
   'Sand wedge',
+  '58 wedge',
   'Lob wedge',
   'Putter',
 ] as const
@@ -292,18 +293,28 @@ export function defaultFinishLie(
 }
 
 export function defaultClub(
+  par: number,
+  shotIndex: number,
   start: Position,
-  mostRecentTeeClub: string,
-  mostRecentOtherClub: string,
 ): string {
   if (start.lie === 'green') return 'Putter'
-  if (start.lie === 'tee') return mostRecentTeeClub
-  return mostRecentOtherClub
+  if (shotIndex === 0 && start.lie === 'tee') {
+    return par >= 4 ? 'Driver' : '7 iron'
+  }
+  if (shotIndex === 1 && par === 4) return '7 iron'
+  if (shotIndex === 1 && par === 5) return '3 wood'
+  return '58 wedge'
 }
 
 export function defaultDistanceEntry(start: Position, finishLie: Lie): number {
   if (start.lie === 'green') return 2
   return finishLie === 'green' ? 10 : 100
+}
+
+export function defaultHoleYardage(par: number): number {
+  if (par === 3) return 150
+  if (par === 5) return 500
+  return 400
 }
 
 export function calculateShot(shot: Shot, shotIndex: number, par: number): ShotResult {

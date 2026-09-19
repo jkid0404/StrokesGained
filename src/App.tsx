@@ -15,6 +15,7 @@ import {
   defaultClub,
   defaultDistanceEntry,
   defaultFinishLie,
+  defaultHoleYardage,
   excludeDeletedCourseTemplates,
   formatMetric,
   mergeCourseTemplates,
@@ -80,20 +81,6 @@ function calculateHoleStrokesGained(hole: Hole): number | null {
   if (results.some((result) => result.strokesGained === null)) return null
 
   return results.reduce((sum, result) => sum + (result.strokesGained ?? 0), 0)
-}
-
-function availableDefaultClub(
-  start: Position,
-  clubs: string[],
-  mostRecentTeeClub: string,
-  mostRecentOtherClub: string,
-): string {
-  const preferred = defaultClub(start, mostRecentTeeClub, mostRecentOtherClub)
-  if (clubs.includes(preferred)) return preferred
-  if (start.lie === 'tee') {
-    return clubs.find((club) => club !== 'Putter') ?? clubs[0] ?? ''
-  }
-  return ''
 }
 
 function App() {
@@ -1060,8 +1047,6 @@ function RoundEntry({
   const startDistance = start.distance
   const startUnit = start.unit
   const mostRecentFinishLie = useRef<Lie>('fairway')
-  const mostRecentTeeClub = useRef(clubs.includes('Driver') ? 'Driver' : '')
-  const mostRecentOtherClub = useRef('')
   const initialFinishLie = defaultFinishLie(
     hole.par,
     hole.shots.length,
@@ -1074,12 +1059,7 @@ function RoundEntry({
   )
   const [penaltyStrokes, setPenaltyStrokes] = useState(0)
   const [club, setClub] = useState(() =>
-    availableDefaultClub(
-      start,
-      clubs,
-      clubs.includes('Driver') ? 'Driver' : '',
-      '',
-    ),
+    defaultClub(hole.par, hole.shots.length, start),
   )
   const [note, setNote] = useState('')
   const [formError, setFormError] = useState('')
@@ -1113,11 +1093,10 @@ function RoundEntry({
     )
     setPenaltyStrokes(0)
     setClub(
-      availableDefaultClub(
+      defaultClub(
+        hole.par,
+        hole.shots.length,
         { lie: startLie, distance: startDistance, unit: startUnit },
-        clubs,
-        mostRecentTeeClub.current,
-        mostRecentOtherClub.current,
       ),
     )
     setNote('')
@@ -1517,6 +1496,9 @@ function RoundEntry({
                     onClick={() => {
                       mostRecentFinishLie.current = lie
                       setFinishLie(lie)
+                      if (lie === 'green') {
+                        setDistance('10')
+                      }
                     }}
                   >
                     {LIE_LABELS[lie]}
@@ -1562,15 +1544,7 @@ function RoundEntry({
                     Club
                     <select
                       value={club}
-                      onChange={(event) => {
-                        const nextClub = event.target.value
-                        setClub(nextClub)
-                        if (start.lie === 'tee') {
-                          mostRecentTeeClub.current = nextClub
-                        } else if (nextClub !== 'Putter') {
-                          mostRecentOtherClub.current = nextClub
-                        }
-                      }}
+                      onChange={(event) => setClub(event.target.value)}
                     >
                       <option value="">No club recorded</option>
                       {clubIsCustom && <option value={club}>{club}</option>}
@@ -2045,7 +2019,9 @@ function ShotEditor({
             onChange={(event) => {
               const lie = event.target.value as Lie
               setFinishLie(lie)
-              if (lie !== 'holed' && distance === '') {
+              if (lie === 'green') {
+                setDistance('10')
+              } else if (lie !== 'holed' && distance === '') {
                 setDistance(String(defaultDistanceEntry(shot.start, lie)))
               }
             }}
@@ -2313,7 +2289,11 @@ function HoleSetup({
   onSave: (par: number, yardage: number) => void | Promise<void>
 }) {
   const [par, setPar] = useState(hole.par >= 3 ? hole.par : 4)
-  const [yardage, setYardage] = useState(hole.yardage > 0 ? String(hole.yardage) : '400')
+  const [yardage, setYardage] = useState(
+    hole.yardage > 0
+      ? String(hole.yardage)
+      : String(defaultHoleYardage(hole.par >= 3 ? hole.par : 4)),
+  )
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -2343,7 +2323,14 @@ function HoleSetup({
       <form onSubmit={submit}>
         <label>
           Par
-          <select value={par} onChange={(event) => setPar(Number(event.target.value))}>
+          <select
+            value={par}
+            onChange={(event) => {
+              const nextPar = Number(event.target.value)
+              setPar(nextPar)
+              setYardage(String(defaultHoleYardage(nextPar)))
+            }}
+          >
             <option value="3">Par 3</option>
             <option value="4">Par 4</option>
             <option value="5">Par 5</option>

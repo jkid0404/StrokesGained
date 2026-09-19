@@ -11,6 +11,7 @@ import {
   defaultFinishLie,
   defaultClub,
   defaultDistanceEntry,
+  defaultHoleYardage,
   expectedStrokes,
   excludeDeletedCourseTemplates,
   mergeCourseTemplates,
@@ -116,17 +117,30 @@ describe('default finishing lie', () => {
 })
 
 describe('default club', () => {
-  it('uses contextual and recently selected club defaults', () => {
+  it('uses par and shot position for deterministic club defaults', () => {
     expect(CLUB_OPTIONS).toContain('Putter')
-    expect(
-      defaultClub({ lie: 'green', distance: 12, unit: 'feet' }, '3 wood', '7 iron'),
-    ).toBe('Putter')
-    expect(
-      defaultClub({ lie: 'tee', distance: 400, unit: 'yards' }, '3 wood', '7 iron'),
-    ).toBe('3 wood')
-    expect(
-      defaultClub({ lie: 'rough', distance: 150, unit: 'yards' }, 'Driver', '7 iron'),
-    ).toBe('7 iron')
+    expect(CLUB_OPTIONS).toContain('58 wedge')
+    expect(defaultClub(4, 2, { lie: 'green', distance: 12, unit: 'feet' })).toBe(
+      'Putter',
+    )
+    expect(defaultClub(4, 0, { lie: 'tee', distance: 400, unit: 'yards' })).toBe(
+      'Driver',
+    )
+    expect(defaultClub(5, 0, { lie: 'tee', distance: 500, unit: 'yards' })).toBe(
+      'Driver',
+    )
+    expect(defaultClub(3, 0, { lie: 'tee', distance: 150, unit: 'yards' })).toBe(
+      '7 iron',
+    )
+    expect(defaultClub(4, 1, { lie: 'fairway', distance: 150, unit: 'yards' })).toBe(
+      '7 iron',
+    )
+    expect(defaultClub(5, 1, { lie: 'fairway', distance: 250, unit: 'yards' })).toBe(
+      '3 wood',
+    )
+    expect(defaultClub(3, 1, { lie: 'rough', distance: 20, unit: 'yards' })).toBe(
+      '58 wedge',
+    )
   })
 })
 
@@ -144,6 +158,14 @@ describe('default distance entry', () => {
     expect(
       defaultDistanceEntry({ lie: 'rough', distance: 150, unit: 'yards' }, 'fairway'),
     ).toBe(100)
+  })
+})
+
+describe('default hole yardage', () => {
+  it('uses standard defaults for par 3, 4, and 5 holes', () => {
+    expect(defaultHoleYardage(3)).toBe(150)
+    expect(defaultHoleYardage(4)).toBe(400)
+    expect(defaultHoleYardage(5)).toBe(500)
   })
 })
 
