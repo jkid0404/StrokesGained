@@ -746,29 +746,38 @@ function Home({
   onOpen: (round: Round) => void
 }) {
   const cumulative = calculateCumulativeMetrics(rounds)
+  const averageVersusPgaTour =
+    cumulative.pgaRoundCount > 0 && cumulative.versusPgaTour !== null
+      ? cumulative.versusPgaTour / cumulative.pgaRoundCount
+      : null
+  const averageVersusPersonal =
+    cumulative.personalRoundCount > 0 &&
+    cumulative.versusPersonalAverage !== null
+      ? cumulative.versusPersonalAverage / cumulative.personalRoundCount
+      : null
 
   return (
     <section className="page">
       <div className="hero-card">
         <div className="hero-overview">
           <span className="eyebrow">All completed rounds</span>
-          <h1>Cumulative strokes gained</h1>
+          <h1>Average strokes gained</h1>
           <p>
-            A running view of your performance against the PGA tour and your own
-            established form.
+            Your average performance per 18 holes against the PGA Tour and your
+            own established form.
           </p>
         </div>
         <div className="hero-metric-grid">
           <HeroMetric
             label="Vs PGA Tour average"
-            value={cumulative.versusPgaTour}
+            value={averageVersusPgaTour}
             detail={`${cumulative.pgaRoundCount} completed round${
               cumulative.pgaRoundCount === 1 ? '' : 's'
             }`}
           />
           <HeroMetric
             label="Vs your average"
-            value={cumulative.versusPersonalAverage}
+            value={averageVersusPersonal}
             detail={
               cumulative.personalRoundCount
                 ? `${cumulative.personalRoundCount} round${

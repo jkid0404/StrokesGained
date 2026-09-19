@@ -22,7 +22,7 @@
   border-top: 1px solid var(--line);
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(170px, 1.4fr) repeat(4, minmax(80px, 0.6fr));
+  grid-template-columns: minmax(170px, 1.4fr) repeat(3, minmax(80px, 0.6fr));
   padding: 15px 22px;
 }
 

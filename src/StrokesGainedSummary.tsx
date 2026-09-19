@@ -10,9 +10,11 @@ const CATEGORY_LABELS: Record<ShotCategory, string> = {
 
 export function StrokesGainedSummary({
   context,
+  showContextPill = true,
   summary,
 }: {
   context: string
+  showContextPill?: boolean
   summary: StrokesGainedSummaryData
 }) {
   return (
@@ -22,7 +24,7 @@ export function StrokesGainedSummary({
           <span className="eyebrow">Strokes gained</span>
           <h2>Performance by category</h2>
         </div>
-        <span className="pill">{context}</span>
+        {showContextPill && <span className="pill">{context}</span>}
       </div>
       <div className="strokes-gained-summary-grid">
         <StrokesGainedMetric

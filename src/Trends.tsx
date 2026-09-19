@@ -326,11 +326,14 @@ export function Trends({
 
           <StrokesGainedSummary
             context={windowContext}
+            showContextPill={false}
             summary={strokesGainedSummary}
           />
 
           <TraditionalStatsPanel
+            averagesOnly
             context={windowContext}
+            showContextPill={false}
             stats={traditionalStats}
           />
 
@@ -340,11 +343,6 @@ export function Trends({
                 <span className="eyebrow">Club analytics</span>
                 <h2>Performance by club</h2>
               </div>
-              <span className="pill">
-                {clubCategory === 'total'
-                  ? 'All shots'
-                  : CATEGORY_LABELS[clubCategory]}
-              </span>
             </div>
             {clubMetrics.length === 0 ? (
               <p className="muted split-empty">
@@ -357,7 +355,6 @@ export function Trends({
                   <span>Shots</span>
                   <span>Avg start</span>
                   <span>SG / shot</span>
-                  <span>Total SG</span>
                 </div>
                 {clubMetrics.map((metric) => (
                   <div className="club-analytics-row" key={metric.key}>
@@ -385,17 +382,6 @@ export function Trends({
                       }
                     >
                       {formatMetric(metric.averageStrokesGained)}
-                    </strong>
-                    <strong
-                      className={
-                        metric.totalStrokesGained === null
-                          ? 'neutral-metric'
-                          : metric.totalStrokesGained >= 0
-                            ? 'positive'
-                            : 'negative'
-                      }
-                    >
-                      {formatMetric(metric.totalStrokesGained)}
                     </strong>
                   </div>
                 ))}
