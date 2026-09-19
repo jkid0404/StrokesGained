@@ -30,6 +30,7 @@ export interface Shot {
   finish: Position
   penaltyStrokes: number
   club?: string
+  knockdown?: boolean
   note?: string
 }
 
@@ -320,6 +321,11 @@ export function defaultHoleYardage(par: number): number {
   if (par === 3) return 150
   if (par === 5) return 500
   return 400
+}
+
+export function isIronClub(club: string): boolean {
+  const normalized = club.trim().toLocaleLowerCase('en-US')
+  return /^(?:[1-9]|driving|utility) iron$/.test(normalized)
 }
 
 export function holeStrokeExpectations(

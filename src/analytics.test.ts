@@ -127,6 +127,38 @@ describe('trend analytics', () => {
     ])
   })
 
+  it('splits iron shots into stock and knockdown rows', () => {
+    const round = makeRound('irons', 'Alpha', 'Blue', '2026-04-02', 9, 400)
+    round.holes[0].shots[0] = {
+      id: 'stock-iron',
+      start: { lie: 'fairway', distance: 160, unit: 'yards' },
+      finish: { lie: 'green', distance: 15, unit: 'feet' },
+      penaltyStrokes: 0,
+      club: '7 iron',
+    }
+    round.holes[1].shots[0] = {
+      id: 'knockdown-iron',
+      start: { lie: 'fairway', distance: 145, unit: 'yards' },
+      finish: { lie: 'green', distance: 12, unit: 'feet' },
+      penaltyStrokes: 0,
+      club: '7 iron',
+      knockdown: true,
+    }
+
+    const metrics = buildClubAnalytics([round], 'total', ['7 iron'])
+
+    expect(
+      metrics.map((metric) => [
+        metric.club,
+        metric.distanceBand,
+        metric.shots,
+      ]),
+    ).toEqual([
+      ['7 iron', 'Stock', 1],
+      ['7 iron', 'Knockdown', 1],
+    ])
+  })
+
   it('includes every bag club and distance band when no shots are recorded', () => {
     const metrics = buildClubAnalytics(
       [],

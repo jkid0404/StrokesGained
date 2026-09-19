@@ -1811,6 +1811,29 @@ textarea:focus {
   margin: 0;
 }
 
+.knockdown-field {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.knockdown-field legend {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+.knockdown-field .segmented {
+  min-height: 46px;
+}
+
+.knockdown-field .segmented button {
+  flex: 1;
+}
+
 .shot-editor-actions {
   display: flex;
   gap: 10px;

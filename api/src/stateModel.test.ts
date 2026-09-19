@@ -95,13 +95,14 @@ describe('cloud state validation', () => {
     ).toThrow(ValidationError)
   })
 
-  it('accepts optional club and note fields and enforces their limits', () => {
+  it('accepts optional club, knockdown, and note fields and enforces their limits', () => {
     const shot = {
       id: 'shot-1',
       start: { lie: 'fairway', distance: 150, unit: 'yards' },
       finish: { lie: 'green', distance: 15, unit: 'feet' },
       penaltyStrokes: 0,
       club: '7 iron',
+      knockdown: true,
       note: 'Into the wind',
     }
     const payload = {
@@ -123,6 +124,22 @@ describe('cloud state validation', () => {
     }
 
     expect(validateStatePayload(payload)).toMatchObject({ revision: 0 })
+    expect(() =>
+      validateStatePayload({
+        ...payload,
+        rounds: [
+          {
+            ...payload.rounds[0],
+            holes: [
+              {
+                ...payload.rounds[0].holes[0],
+                shots: [{ ...shot, knockdown: 'yes' }],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(ValidationError)
     expect(() =>
       validateStatePayload({
         ...payload,

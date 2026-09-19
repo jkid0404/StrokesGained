@@ -19,6 +19,7 @@ import {
   excludeDeletedCourseTemplates,
   formatMetric,
   holeStrokeExpectations,
+  isIronClub,
   mergeCourseTemplates,
   type CourseTemplate,
   type Hole,
@@ -1074,6 +1075,7 @@ function RoundEntry({
   const [club, setClub] = useState(() =>
     defaultClub(hole.par, hole.shots.length, start),
   )
+  const [knockdown, setKnockdown] = useState(false)
   const [note, setNote] = useState('')
   const [formError, setFormError] = useState('')
   const [editingHoleDetails, setEditingHoleDetails] = useState(false)
@@ -1122,6 +1124,7 @@ function RoundEntry({
         { lie: startLie, distance: startDistance, unit: startUnit },
       ),
     )
+    setKnockdown(false)
     setNote('')
     setFormError('')
     setEditingHoleDetails(false)
@@ -1206,6 +1209,7 @@ function RoundEntry({
       finish,
       penaltyStrokes,
       ...(trimmedClub ? { club: trimmedClub } : {}),
+      ...(isIronClub(trimmedClub) ? { knockdown } : {}),
       ...(trimmedNote ? { note: trimmedNote } : {}),
     }
     const result = calculateShot(shot, hole.shots.length, hole.par)
@@ -1447,7 +1451,13 @@ function RoundEntry({
                         </small>
                         {(shot.club || shot.note) && (
                           <small className="shot-metadata">
-                            {[shot.club, shot.note].filter(Boolean).join(' · ')}
+                            {[
+                              shot.club,
+                              shot.knockdown ? 'Knockdown' : null,
+                              shot.note,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
                           </small>
                         )}
                       </span>
@@ -1603,7 +1613,11 @@ function RoundEntry({
                     Club
                     <select
                       value={club}
-                      onChange={(event) => setClub(event.target.value)}
+                      onChange={(event) => {
+                        const nextClub = event.target.value
+                        setClub(nextClub)
+                        if (!isIronClub(nextClub)) setKnockdown(false)
+                      }}
                     >
                       <option value="">No club recorded</option>
                       {clubIsCustom && <option value={club}>{club}</option>}
@@ -1614,6 +1628,12 @@ function RoundEntry({
                       ))}
                     </select>
                   </label>
+                  {isIronClub(club) && (
+                    <KnockdownToggle
+                      knockdown={knockdown}
+                      onChange={setKnockdown}
+                    />
+                  )}
                   <label>
                     Shot note
                     <textarea
@@ -2028,6 +2048,7 @@ function ShotEditor({
   )
   const [penaltyStrokes, setPenaltyStrokes] = useState(shot.penaltyStrokes)
   const [club, setClub] = useState(shot.club ?? '')
+  const [knockdown, setKnockdown] = useState(shot.knockdown ?? false)
   const [note, setNote] = useState(shot.note ?? '')
   const [error, setError] = useState('')
 
@@ -2057,6 +2078,7 @@ function ShotEditor({
       finish,
       penaltyStrokes,
       ...(club.trim() ? { club: club.trim() } : { club: undefined }),
+      knockdown: isIronClub(club) ? knockdown : undefined,
       ...(note.trim() ? { note: note.trim() } : { note: undefined }),
     }
     const result = calculateShot(updatedShot, shotIndex, par)
@@ -2119,7 +2141,14 @@ function ShotEditor({
         </label>
         <label>
           Club
-          <select value={club} onChange={(event) => setClub(event.target.value)}>
+          <select
+            value={club}
+            onChange={(event) => {
+              const nextClub = event.target.value
+              setClub(nextClub)
+              if (!isIronClub(nextClub)) setKnockdown(false)
+            }}
+          >
             <option value="">No club recorded</option>
             {club && !clubs.some((option) => option === club) && (
               <option value={club}>{club}</option>
@@ -2131,6 +2160,9 @@ function ShotEditor({
             ))}
           </select>
         </label>
+        {isIronClub(club) && (
+          <KnockdownToggle knockdown={knockdown} onChange={setKnockdown} />
+        )}
       </div>
       <label>
         Shot note
@@ -2151,6 +2183,36 @@ function ShotEditor({
         </button>
       </div>
     </form>
+  )
+}
+
+function KnockdownToggle({
+  knockdown,
+  onChange,
+}: {
+  knockdown: boolean
+  onChange: (knockdown: boolean) => void
+}) {
+  return (
+    <fieldset className="knockdown-field">
+      <legend>Knockdown</legend>
+      <div className="segmented">
+        <button
+          className={!knockdown ? 'active' : ''}
+          type="button"
+          onClick={() => onChange(false)}
+        >
+          No
+        </button>
+        <button
+          className={knockdown ? 'active' : ''}
+          type="button"
+          onClick={() => onChange(true)}
+        >
+          Yes
+        </button>
+      </div>
+    </fieldset>
   )
 }
 

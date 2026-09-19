@@ -2,6 +2,7 @@ import {
   buildPersonalBaseline,
   calculateRound,
   calculateShot,
+  isIronClub,
   type Round,
   type ShotCategory,
 } from './domain'
@@ -192,6 +193,7 @@ export function buildClubAnalytics(
           normalizedClub,
           normalizedDistance.distance,
           normalizedDistance.unit,
+          shot.knockdown === true,
         )
         const key = `${normalizedClub}::${bucket.key}`
         const group = groups.get(key) ?? {
@@ -239,6 +241,12 @@ export function buildClubAnalytics(
 function clubDistanceBucketsFor(
   normalizedClub: string,
 ): Array<{ key: string; label: string | null }> {
+  if (isIronClub(normalizedClub)) {
+    return [
+      { key: 'stock', label: 'Stock' },
+      { key: 'knockdown', label: 'Knockdown' },
+    ]
+  }
   if (normalizedClub === 'putter') {
     return [
       { key: '0-6', label: '0–6 ft' },
@@ -261,8 +269,15 @@ function clubDistanceBucket(
   normalizedClub: string,
   distance: number,
   unit: 'yards' | 'feet',
+  knockdown: boolean,
 ): { key: string; label: string | null } {
   const displayedDistance = Math.round(distance)
+
+  if (isIronClub(normalizedClub)) {
+    return knockdown
+      ? { key: 'knockdown', label: 'Knockdown' }
+      : { key: 'stock', label: 'Stock' }
+  }
 
   if (normalizedClub === 'putter') {
     if (displayedDistance <= 6) return { key: '0-6', label: '0–6 ft' }
@@ -306,6 +321,8 @@ function clubOrderIndex(club: string, clubOrder: readonly string[]): number {
 function clubBucketOrder(key: string): number {
   const band = key.slice(key.lastIndexOf('::') + 2)
   const orders: Record<string, number> = {
+    stock: 0,
+    knockdown: 1,
     '0-6': 0,
     '0-30': 0,
     '31-65': 1,
