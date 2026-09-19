@@ -229,9 +229,17 @@ function App() {
     const key = courseKey(round.courseName, teeName)
     setDeletedCourseKeys((keys) => keys.filter((deletedKey) => deletedKey !== key))
     if (!courses.some((course) => course.key === key)) {
+      const configuredHoles = Object.fromEntries(
+        round.holes
+          .filter((hole) => hole.par >= 3 && hole.yardage > 0)
+          .map((hole) => [
+            hole.number,
+            { par: hole.par, yardage: hole.yardage },
+          ]),
+      )
       setPersonalCourses((current) => [
         ...current,
-        { key, name: round.courseName, teeName, holes: {} },
+        { key, name: round.courseName, teeName, holes: configuredHoles },
       ].sort((a, b) => a.name.localeCompare(b.name)))
     }
     setActiveRoundId(round.id)
@@ -242,10 +250,16 @@ function App() {
     setView('entry')
   }
 
-  async function updateCourseHole(round: Round, hole: Hole) {
+  async function updateCourseHoles(round: Round, holes: Hole[]) {
     const courseName = round.courseName
     const teeName = round.teeName ?? 'Unspecified tees'
     const key = courseKey(courseName, teeName)
+    const updatedHoleDetails = Object.fromEntries(
+      holes.map((hole) => [
+        hole.number,
+        { par: hole.par, yardage: hole.yardage },
+      ]),
+    )
     setDeletedCourseKeys((keys) => keys.filter((deletedKey) => deletedKey !== key))
     const sharedCourse = sharedCourseCatalog.find(
       (course) =>
@@ -265,7 +279,7 @@ function App() {
         ...sharedCourse,
         holes: {
           ...sharedCourse.holes,
-          [hole.number]: { par: hole.par, yardage: hole.yardage },
+          ...updatedHoleDetails,
         },
       })
       return
@@ -279,7 +293,7 @@ function App() {
         ...(existing?.aliases?.length ? { aliases: existing.aliases } : {}),
         holes: {
           ...(existing?.holes ?? {}),
-          [hole.number]: { par: hole.par, yardage: hole.yardage },
+          ...updatedHoleDetails,
         },
       }
       return [...current.filter((course) => course.key !== key), updated].sort(
@@ -522,7 +536,7 @@ function App() {
             }
             onHoleChange={setActiveHoleIndex}
             onChange={upsertRound}
-            onHoleDetailsChange={updateCourseHole}
+            onHoleDetailsChange={updateCourseHoles}
             onReview={() => setView('review')}
           />
         )}
@@ -915,15 +929,28 @@ function RoundSetup({
   const [playedOn, setPlayedOn] = useState(new Date().toISOString().slice(0, 10))
   const [holeCount, setHoleCount] = useState<9 | 18>(18)
   const [startingHole, setStartingHole] = useState(1)
+  const [newCourseHoles, setNewCourseHoles] = useState<
+    Record<number, { par: number; yardage: string }>
+  >({})
+  const roundHoles = buildHoleSequence(holeCount, startingHole)
+  const configuredHoleCount = roundHoles.filter((hole) => {
+    const yardage = Number(newCourseHoles[hole.number]?.yardage)
+    return Number.isFinite(yardage) && yardage > 0
+  }).length
 
   function submit(event: React.FormEvent) {
     event.preventDefault()
     const selectedTemplate = courses.find(
       (template) => template.key === selectedCourseKey,
     )
-    const holes = buildHoleSequence(holeCount, startingHole).map((hole) => {
+    const holes = roundHoles.map((hole) => {
       const savedHole = selectedTemplate?.holes[hole.number]
-      return savedHole ? { ...hole, ...savedHole } : hole
+      if (savedHole) return { ...hole, ...savedHole }
+      const enteredHole = newCourseHoles[hole.number]
+      const yardage = Number(enteredHole?.yardage)
+      return enteredHole && Number.isFinite(yardage) && yardage > 0
+        ? { ...hole, par: enteredHole.par, yardage }
+        : hole
     })
 
     onStart({
@@ -1031,16 +1058,88 @@ function RoundSetup({
             </div>
           </fieldset>
         </div>
+        {selectedCourseKey === '' && (
+          <div className="card bulk-hole-setup">
+            <div className="section-heading compact-heading">
+              <div>
+                <span className="eyebrow">Optional scorecard setup</span>
+                <h2>Add hole yardages</h2>
+              </div>
+              <span className="muted">
+                {configuredHoleCount}/{roundHoles.length} entered
+              </span>
+            </div>
+            <p className="muted">
+              Enter as many holes as you know now. You can start the round at any
+              time and add the rest while playing.
+            </p>
+            <div className="bulk-hole-grid">
+              <div className="bulk-hole-row table-header">
+                <span>Hole</span>
+                <span>Par</span>
+                <span>Yardage</span>
+              </div>
+              {roundHoles.map((hole) => {
+                const details = newCourseHoles[hole.number] ?? {
+                  par: 4,
+                  yardage: '',
+                }
+                return (
+                  <div className="bulk-hole-row" key={hole.number}>
+                    <strong>{hole.number}</strong>
+                    <select
+                      aria-label={`Par for hole ${hole.number}`}
+                      value={details.par}
+                      onChange={(event) => {
+                        const nextPar = Number(event.target.value)
+                        setNewCourseHoles((current) => ({
+                          ...current,
+                          [hole.number]: {
+                            par: nextPar,
+                            yardage:
+                              current[hole.number]?.yardage ||
+                              String(defaultHoleYardage(nextPar)),
+                          },
+                        }))
+                      }}
+                    >
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                    </select>
+                    <input
+                      aria-label={`Yardage for hole ${hole.number}`}
+                      inputMode="numeric"
+                      min="1"
+                      placeholder={String(defaultHoleYardage(details.par))}
+                      type="number"
+                      value={details.yardage}
+                      onChange={(event) =>
+                        setNewCourseHoles((current) => ({
+                          ...current,
+                          [hole.number]: {
+                            par: details.par,
+                            yardage: event.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
         <div className="setup-explainer">
           <strong>
             {selectedCourseKey
               ? 'Saved hole details will be reused.'
-              : 'No scorecard entry required.'}
+              : 'Add as much of the scorecard as you want.'}
           </strong>
           <span>
             {selectedCourseKey
               ? 'Any missing holes will be requested when you reach them.'
-              : "You will enter each hole's par and yardage as you play it."}
+              : 'Blank holes can be completed from the round screen when you are ready.'}
           </span>
         </div>
         <div className="actions">
@@ -1074,7 +1173,7 @@ function RoundEntry({
   isCloudSynced: boolean
   onHoleChange: (index: number) => void
   onChange: (round: Round) => void
-  onHoleDetailsChange: (round: Round, hole: Hole) => Promise<void>
+  onHoleDetailsChange: (round: Round, holes: Hole[]) => Promise<void>
   onReview: () => void
 }) {
   const hole = round.holes[activeHoleIndex]
@@ -1104,6 +1203,7 @@ function RoundEntry({
   const [note, setNote] = useState('')
   const [formError, setFormError] = useState('')
   const [editingHoleDetails, setEditingHoleDetails] = useState(false)
+  const [editingRemainingHoles, setEditingRemainingHoles] = useState(false)
   const [editingShotIndex, setEditingShotIndex] = useState<number | null>(null)
   const shotCardRef = useRef<HTMLDivElement>(null)
   const holeTabsRef = useRef<HTMLDivElement>(null)
@@ -1114,6 +1214,9 @@ function RoundEntry({
     calculateShot(shot, index, hole.par),
   )
   const holeStrokesGained = calculateHoleStrokesGained(hole)
+  const remainingUnconfiguredHoles = round.holes.filter(
+    (item) => item.par < 3 || item.yardage <= 0,
+  )
   const personalBaseline = buildPersonalBaseline(allRounds, round)
   let expectedHoleStrokes: ReturnType<typeof holeStrokeExpectations> | null = null
   try {
@@ -1153,6 +1256,7 @@ function RoundEntry({
     setNote('')
     setFormError('')
     setEditingHoleDetails(false)
+    setEditingRemainingHoles(false)
     setEditingShotIndex(null)
   }, [
     activeHoleIndex,
@@ -1269,30 +1373,42 @@ function RoundEntry({
   }
 
   async function saveHoleDetails(par: number, yardage: number) {
-    const updatedHoles = round.holes.map((item, index) =>
-      index === activeHoleIndex
-        ? {
-            ...item,
-            par,
-            yardage,
-            shots: item.shots.map((shot, shotIndex) =>
-              shotIndex === 0 && shot.start.lie === 'tee'
-                ? {
-                    ...shot,
-                    start: { ...shot.start, distance: yardage, unit: 'yards' as const },
-                  }
-                : shot,
-            ),
-          }
-        : item,
-    )
-    onChange({ ...round, holes: updatedHoles })
-    await onHoleDetailsChange(round, {
+    const updatedHole = {
       ...hole,
       par,
       yardage,
-    })
+      shots: hole.shots.map((shot, shotIndex) =>
+        shotIndex === 0 && shot.start.lie === 'tee'
+          ? {
+              ...shot,
+              start: { ...shot.start, distance: yardage, unit: 'yards' as const },
+            }
+          : shot,
+      ),
+    }
+    const updatedHoles = round.holes.map((item, index) =>
+      index === activeHoleIndex ? updatedHole : item,
+    )
+    onChange({ ...round, holes: updatedHoles })
+    await onHoleDetailsChange(round, [updatedHole])
     setEditingHoleDetails(false)
+  }
+
+  async function saveRemainingHoleDetails(configuredHoles: Hole[]) {
+    const configuredByNumber = new Map(
+      configuredHoles.map((configuredHole) => [
+        configuredHole.number,
+        configuredHole,
+      ]),
+    )
+    await onHoleDetailsChange(round, configuredHoles)
+    onChange({
+      ...round,
+      holes: round.holes.map(
+        (item) => configuredByNumber.get(item.number) ?? item,
+      ),
+    })
+    setEditingRemainingHoles(false)
   }
 
   const allComplete = metrics.completedHoles === round.holes.length
@@ -1370,6 +1486,28 @@ function RoundEntry({
           )
         })}
       </div>
+
+      {!needsHoleSetup && remainingUnconfiguredHoles.length > 0 && (
+        <div className="remaining-hole-setup">
+          <button
+            className="secondary"
+            type="button"
+            onClick={() => setEditingRemainingHoles((current) => !current)}
+          >
+            {editingRemainingHoles
+              ? 'Close future hole setup'
+              : `Add future hole yardages (${remainingUnconfiguredHoles.length} remaining)`}
+          </button>
+        </div>
+      )}
+
+      {editingRemainingHoles && remainingUnconfiguredHoles.length > 0 && (
+        <RemainingHoleSetup
+          holes={remainingUnconfiguredHoles}
+          onCancel={() => setEditingRemainingHoles(false)}
+          onSave={saveRemainingHoleDetails}
+        />
+      )}
 
       <div className="live-category-grid" aria-label="Live strokes gained by category">
         {(Object.keys(metrics.categories) as ShotCategory[]).map((category) => {
@@ -2506,6 +2644,125 @@ function HoleSetup({
         {error && <div className="error-message">{error}</div>}
       </form>
     </div>
+  )
+}
+
+function RemainingHoleSetup({
+  holes,
+  onCancel,
+  onSave,
+}: {
+  holes: Hole[]
+  onCancel: () => void
+  onSave: (holes: Hole[]) => void | Promise<void>
+}) {
+  const [details, setDetails] = useState<
+    Record<number, { par: number; yardage: string }>
+  >({})
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const configured = holes.flatMap((hole) => {
+    const entry = details[hole.number]
+    const yardage = Number(entry?.yardage)
+    return entry && Number.isFinite(yardage) && yardage > 0
+      ? [{ ...hole, par: entry.par, yardage }]
+      : []
+  })
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault()
+    if (configured.length === 0) {
+      setError('Enter a yardage for at least one hole.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      await onSave(configured)
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : 'Unable to save hole details.',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form className="card bulk-hole-setup in-round" onSubmit={submit}>
+      <div className="section-heading compact-heading">
+        <div>
+          <span className="eyebrow">Round scorecard</span>
+          <h2>Add remaining hole yardages</h2>
+        </div>
+        <span className="muted">
+          {configured.length}/{holes.length} ready
+        </span>
+      </div>
+      <div className="bulk-hole-grid">
+        <div className="bulk-hole-row table-header">
+          <span>Hole</span>
+          <span>Par</span>
+          <span>Yardage</span>
+        </div>
+        {holes.map((hole) => {
+          const entry = details[hole.number] ?? { par: 4, yardage: '' }
+          return (
+            <div className="bulk-hole-row" key={hole.number}>
+              <strong>{hole.number}</strong>
+              <select
+                aria-label={`Par for hole ${hole.number}`}
+                value={entry.par}
+                onChange={(event) => {
+                  const nextPar = Number(event.target.value)
+                  setDetails((current) => ({
+                    ...current,
+                    [hole.number]: {
+                      par: nextPar,
+                      yardage:
+                        current[hole.number]?.yardage ||
+                        String(defaultHoleYardage(nextPar)),
+                    },
+                  }))
+                }}
+              >
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+              <input
+                aria-label={`Yardage for hole ${hole.number}`}
+                inputMode="numeric"
+                min="1"
+                placeholder={String(defaultHoleYardage(entry.par))}
+                type="number"
+                value={entry.yardage}
+                onChange={(event) =>
+                  setDetails((current) => ({
+                    ...current,
+                    [hole.number]: {
+                      par: entry.par,
+                      yardage: event.target.value,
+                    },
+                  }))
+                }
+              />
+            </div>
+          )
+        })}
+      </div>
+      <div className="hole-setup-actions">
+        <button className="secondary" type="button" onClick={onCancel}>
+          Continue round
+        </button>
+        <button className="primary" disabled={saving} type="submit">
+          Save entered holes
+        </button>
+      </div>
+      {error && <div className="error-message">{error}</div>}
+    </form>
   )
 }
 

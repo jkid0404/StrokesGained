@@ -1118,6 +1118,75 @@ textarea:focus {
   border-top: 0;
 }
 
+.bulk-hole-setup {
+  margin: 18px 0;
+  overflow: hidden;
+}
+
+.bulk-hole-setup > .section-heading,
+.bulk-hole-setup > p,
+.bulk-hole-setup > .hole-setup-actions,
+.bulk-hole-setup > .error-message {
+  margin-left: 22px;
+  margin-right: 22px;
+}
+
+.bulk-hole-setup > p {
+  line-height: 1.5;
+}
+
+.bulk-hole-grid {
+  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  max-height: 430px;
+  overflow-y: auto;
+}
+
+.bulk-hole-row {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 60px minmax(90px, 120px) minmax(120px, 1fr);
+  padding: 10px 22px;
+}
+
+.bulk-hole-row:first-child {
+  border-top: 0;
+}
+
+.bulk-hole-row input,
+.bulk-hole-row select {
+  min-height: 40px;
+}
+
+.bulk-hole-setup.in-round {
+  margin: 0 0 20px;
+}
+
+.remaining-hole-setup {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 18px;
+}
+
+@media (max-width: 420px) {
+  .bulk-hole-row {
+    gap: 8px;
+    grid-template-columns: 36px minmax(68px, 82px) minmax(0, 1fr);
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .bulk-hole-setup > .section-heading,
+  .bulk-hole-setup > p,
+  .bulk-hole-setup > .hole-setup-actions,
+  .bulk-hole-setup > .error-message {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+}
+
 .header-row,
 .editor-header {
   background: #f4f6f3;
