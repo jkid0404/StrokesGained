@@ -2684,10 +2684,7 @@ function Results({
         />
       </div>
 
-      <TraditionalStatsPanel
-        context="Round summary"
-        stats={traditionalStats}
-      />
+      <TraditionalStatsPanel stats={traditionalStats} />
 
       <div className="card">
         <div className="section-heading compact-heading">

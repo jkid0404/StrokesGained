@@ -69,39 +69,14 @@ export function CourseInsightsPage({
 
           <StrokesGainedSummary
             context={`${course.name} · ${course.teeName}`}
+            showContextPill={false}
             summary={insights.strokesGainedSummary}
           />
 
           <TraditionalStatsPanel
-            context={`${course.name} · ${course.teeName}`}
+            showContextPill={false}
             stats={insights.traditionalStats}
           />
-
-          <div className="card trouble-holes-card">
-            <div className="section-heading compact-heading">
-              <div>
-                <span className="eyebrow">Recurring challenges</span>
-                <h2>Trouble holes</h2>
-              </div>
-            </div>
-            <div className="trouble-hole-grid">
-              {insights.troubleHoles.map((hole) => (
-                <div className="trouble-hole" key={hole.holeNumber}>
-                  <span>Hole {hole.holeNumber}</span>
-                  <strong
-                    className={hole.averageToPar <= 0 ? 'positive' : 'negative'}
-                  >
-                    {formatToPar(hole.averageToPar)}
-                  </strong>
-                  <small>
-                    {hole.averageScore.toFixed(2)} avg score · {hole.plays} play
-                    {hole.plays === 1 ? '' : 's'} ·{' '}
-                    {hole.established ? 'Established' : 'Provisional'}
-                  </small>
-                </div>
-              ))}
-            </div>
-          </div>
 
           <div className="card course-hole-card">
             <div className="section-heading compact-heading">

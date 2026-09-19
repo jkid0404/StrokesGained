@@ -45,11 +45,10 @@ describe('course and hole insights', () => {
       parLabel: '4–5',
       plays: 2,
       fairways: { made: 1, opportunities: 2 },
-      established: false,
     })
   })
 
-  it('ranks recurring trouble holes by score to par', () => {
+  it('aggregates course and hole performance metrics', () => {
     const rounds = Array.from({ length: 3 }, (_, index) =>
       makeRound(`round-${index}`, 'Alpha', 'Blue', `2026-01-0${index + 1}`, [
         makeHole(1, 4, 'fairway', 0),
@@ -59,8 +58,6 @@ describe('course and hole insights', () => {
 
     const insights = buildCourseInsights(rounds, course)
 
-    expect(insights.troubleHoles[0].holeNumber).toBe(2)
-    expect(insights.troubleHoles[0].established).toBe(true)
     expect(insights.traditionalStats.holesPlayed).toBe(6)
     expect(insights.averageStrokesGainedPer18).not.toBeNull()
     expect(insights.strokesGainedSummary.totalPer18).not.toBeNull()

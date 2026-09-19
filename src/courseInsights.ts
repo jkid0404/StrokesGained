@@ -25,12 +25,10 @@ export interface CourseHoleInsight {
   averageToPar: number
   averageStrokesGained: number | null
   strokesGainedCategories: Record<ShotCategory, number | null>
-  supportedStrokesGainedRounds: number
   fairways: CountMetric
   greensInRegulation: CountMetric
   averagePutts: number
   averagePenalties: number
-  established: boolean
 }
 
 export interface CourseInsights {
@@ -42,7 +40,6 @@ export interface CourseInsights {
   strokesGainedSummary: StrokesGainedSummary
   traditionalStats: TraditionalStats
   holes: CourseHoleInsight[]
-  troubleHoles: CourseHoleInsight[]
 }
 
 interface HoleAccumulator {
@@ -139,14 +136,6 @@ export function buildCourseInsights(
     strokesGainedSummary: buildStrokesGainedSummary(matchingRounds),
     traditionalStats: calculateTraditionalStats(matchingRounds),
     holes,
-    troubleHoles: [...holes]
-      .sort(
-        (a, b) =>
-          b.averageToPar - a.averageToPar ||
-          (a.averageStrokesGained ?? Number.POSITIVE_INFINITY) -
-            (b.averageStrokesGained ?? Number.POSITIVE_INFINITY),
-      )
-      .slice(0, 3),
   }
 }
 
@@ -174,12 +163,10 @@ function toHoleInsight(group: HoleAccumulator): CourseHoleInsight {
         ],
       ),
     ) as Record<ShotCategory, number | null>,
-    supportedStrokesGainedRounds: group.strokesGained.length,
     fairways: group.fairways,
     greensInRegulation: group.greensInRegulation,
     averagePutts: group.putts / group.scores.length,
     averagePenalties: group.penalties / group.scores.length,
-    established: group.scores.length >= 3,
   }
 }
 
