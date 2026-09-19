@@ -15,6 +15,7 @@ import {
   expectedStrokes,
   excludeDeletedCourseTemplates,
   holeStrokeExpectations,
+  isIronClub,
   mergeCourseTemplates,
   type Round,
   type Shot,
@@ -142,6 +143,14 @@ describe('default club', () => {
     expect(defaultClub(3, 1, { lie: 'rough', distance: 20, unit: 'yards' })).toBe(
       '58 wedge',
     )
+  })
+
+  it('treats numbered, driving, utility, and pitching wedge clubs as irons', () => {
+    expect(isIronClub('7 iron')).toBe(true)
+    expect(isIronClub('Driving iron')).toBe(true)
+    expect(isIronClub('Utility iron')).toBe(true)
+    expect(isIronClub('Pitching wedge')).toBe(true)
+    expect(isIronClub('58 wedge')).toBe(false)
   })
 })
 

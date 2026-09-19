@@ -2589,7 +2589,6 @@ function RoundReview({
           <span>Hole</span>
           <span>Par</span>
           <span>Score</span>
-          <span>To par</span>
           <span>SG</span>
           <span />
         </div>
@@ -2600,21 +2599,26 @@ function RoundReview({
           )
           const isComplete = hole.shots.at(-1)?.finish.lie === 'holed'
           const strokesGained = calculateHoleStrokesGained(hole)
+          const scoreToPar = score - hole.par
+          const scoreResult = isComplete
+            ? scorecardResult(scoreToPar)
+            : null
           return (
             <div className="round-review-row" key={hole.number}>
               <strong>{hole.number}</strong>
               <span>{hole.par || '—'}</span>
-              <span>{score || '—'}</span>
               <strong
-                className={
-                  !isComplete
-                    ? 'unsupported'
-                    : score - hole.par <= 0
-                      ? 'positive'
-                      : 'negative'
+                aria-label={
+                  isComplete
+                    ? `Score ${score}, ${scoreResult?.label}`
+                    : 'Incomplete'
                 }
+                className={`scorecard-score ${
+                  scoreResult?.className ?? 'incomplete'
+                }`}
+                title={isComplete ? scoreResult?.label : 'Incomplete'}
               >
-                {isComplete ? formatToPar(score - hole.par) : 'Incomplete'}
+                {isComplete ? score : '—'}
               </strong>
               <strong
                 className={
@@ -2708,7 +2712,7 @@ function Results({
         />
       </div>
 
-      <TraditionalStatsPanel stats={traditionalStats} />
+      <TraditionalStatsPanel showHeading={false} stats={traditionalStats} />
 
       <div className="card">
         <div className="section-heading compact-heading">
@@ -2755,6 +2759,22 @@ function Results({
 function formatToPar(value: number): string {
   if (value === 0) return 'E'
   return value > 0 ? `+${value}` : String(value)
+}
+
+function scorecardResult(scoreToPar: number): {
+  className: string
+  label: string
+} {
+  if (scoreToPar <= -2) {
+    return { className: 'eagle-or-better', label: 'eagle or better' }
+  }
+  if (scoreToPar === -1) return { className: 'birdie', label: 'birdie' }
+  if (scoreToPar === 0) return { className: 'par', label: 'par' }
+  if (scoreToPar === 1) return { className: 'bogey', label: 'bogey' }
+  if (scoreToPar === 2) {
+    return { className: 'double-bogey', label: 'double bogey' }
+  }
+  return { className: 'triple-bogey', label: 'triple bogey or worse' }
 }
 
 function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {

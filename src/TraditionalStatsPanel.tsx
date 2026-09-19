@@ -4,10 +4,12 @@ export function TraditionalStatsPanel({
   stats,
   averagesOnly = false,
   showContextPill = true,
+  showHeading = true,
 }: {
   stats: TraditionalStats
   averagesOnly?: boolean
   showContextPill?: boolean
+  showHeading?: boolean
 }) {
   const puttsPer18 =
     stats.puttsPerHole === null ? null : stats.puttsPerHole * 18
@@ -22,16 +24,18 @@ export function TraditionalStatsPanel({
 
   return (
     <div className="card traditional-stats-card">
-      <div className="section-heading compact-heading">
-        <div>
-          <span className="eyebrow">Traditional statistics</span>
+      {showHeading && (
+        <div className="section-heading compact-heading">
+          <div>
+            <span className="eyebrow">Traditional statistics</span>
+          </div>
+          {showContextPill && (
+            <span className="pill">
+              {stats.holesPlayed} hole{stats.holesPlayed === 1 ? '' : 's'}
+            </span>
+          )}
         </div>
-        {showContextPill && (
-          <span className="pill">
-            {stats.holesPlayed} hole{stats.holesPlayed === 1 ? '' : 's'}
-          </span>
-        )}
-      </div>
+      )}
 
       <div className="traditional-stat-grid">
         <TraditionalMetric

@@ -74,17 +74,11 @@ export function CourseInsightsPage({
           />
 
           <TraditionalStatsPanel
-            showContextPill={false}
+            showHeading={false}
             stats={insights.traditionalStats}
           />
 
           <div className="card course-hole-card">
-            <div className="section-heading compact-heading">
-              <div>
-                <span className="eyebrow">Hole-by-hole performance</span>
-                <h2>Hole insights</h2>
-              </div>
-            </div>
             <div className="course-hole-scroll">
               <div className="course-hole-table">
                 <div className="course-hole-row table-header">

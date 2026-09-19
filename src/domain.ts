@@ -325,7 +325,10 @@ export function defaultHoleYardage(par: number): number {
 
 export function isIronClub(club: string): boolean {
   const normalized = club.trim().toLocaleLowerCase('en-US')
-  return /^(?:[1-9]|driving|utility) iron$/.test(normalized)
+  return (
+    normalized === 'pitching wedge' ||
+    /^(?:[1-9]|driving|utility) iron$/.test(normalized)
+  )
 }
 
 export function holeStrokeExpectations(
