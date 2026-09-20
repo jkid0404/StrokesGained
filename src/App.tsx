@@ -12,7 +12,6 @@ import {
   calculateShot,
   courseKey,
   createId,
-  defaultClub,
   defaultDistanceEntry,
   defaultFinishLie,
   defaultHoleYardage,
@@ -21,6 +20,8 @@ import {
   holeStrokeExpectations,
   isIronClub,
   mergeCourseTemplates,
+  roundMatchesCourse,
+  suggestedClub,
   type CourseTemplate,
   type Hole,
   type Lie,
@@ -538,6 +539,10 @@ function App() {
             round={activeRound}
             allRounds={rounds}
             clubs={clubs}
+            courseAliases={
+              courses.find((course) => roundMatchesCourse(activeRound, course))
+                ?.aliases ?? []
+            }
             activeHoleIndex={Math.max(0, activeHoleIndex)}
             isCloudSynced={
               cloud.syncStatus === 'saved' && cloud.pendingChanges === 0
@@ -1167,6 +1172,7 @@ function RoundEntry({
   round,
   allRounds,
   clubs,
+  courseAliases,
   activeHoleIndex,
   isCloudSynced,
   onHoleChange,
@@ -1177,6 +1183,7 @@ function RoundEntry({
   round: Round
   allRounds: Round[]
   clubs: string[]
+  courseAliases: string[]
   activeHoleIndex: number
   isCloudSynced: boolean
   onHoleChange: (index: number) => void
@@ -1199,14 +1206,21 @@ function RoundEntry({
     start,
     'fairway',
   )
+  const personalizedClub = suggestedClub(
+    allRounds,
+    round,
+    hole,
+    hole.shots.length,
+    start,
+    clubs,
+    courseAliases,
+  )
   const [finishLie, setFinishLie] = useState<Lie>(initialFinishLie)
   const [distance, setDistance] = useState(
     String(defaultDistanceEntry(start, initialFinishLie)),
   )
   const [penaltyStrokes, setPenaltyStrokes] = useState(0)
-  const [club, setClub] = useState(() =>
-    defaultClub(hole.par, hole.shots.length, start),
-  )
+  const [club, setClub] = useState(personalizedClub)
   const [knockdown, setKnockdown] = useState(false)
   const [note, setNote] = useState('')
   const [formError, setFormError] = useState('')
@@ -1253,13 +1267,7 @@ function RoundEntry({
       ),
     )
     setPenaltyStrokes(0)
-    setClub(
-      defaultClub(
-        hole.par,
-        hole.shots.length,
-        { lie: startLie, distance: startDistance, unit: startUnit },
-      ),
-    )
+    setClub(personalizedClub)
     setKnockdown(false)
     setNote('')
     setFormError('')
@@ -1271,6 +1279,7 @@ function RoundEntry({
     clubs,
     hole.par,
     hole.shots.length,
+    personalizedClub,
     startDistance,
     startLie,
     startUnit,

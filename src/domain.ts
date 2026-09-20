@@ -317,6 +317,145 @@ export function defaultClub(
   return '58 wedge'
 }
 
+export function suggestedClub(
+  rounds: Round[],
+  currentRound: Round,
+  currentHole: Hole,
+  shotIndex: number,
+  start: Position,
+  availableClubs: readonly string[],
+  courseAliases: readonly string[] = [],
+): string {
+  const fallback = defaultClub(currentHole.par, shotIndex, start)
+  if (start.lie === 'green') return fallback
+
+  const availableByName = new Map(
+    availableClubs.map((club) => [club.trim().toLocaleLowerCase('en-US'), club]),
+  )
+  const targetCategory = shotCategory(
+    {
+      id: '',
+      start,
+      finish: start,
+      penaltyStrokes: 0,
+    },
+    shotIndex,
+    currentHole.par,
+  )
+  const tolerance =
+    targetCategory === 'off-the-tee'
+      ? 60
+      : targetCategory === 'recovery'
+        ? 50
+        : targetCategory === 'around-the-green'
+          ? 20
+          : 30
+  const currentCourseKey = courseKey(
+    currentRound.courseName,
+    currentRound.teeName?.trim() || 'Unspecified tees',
+  )
+  const currentCourseIdentities = new Set([
+    currentCourseKey,
+    ...courseAliases,
+  ])
+  const candidates = rounds
+    .filter(
+      (round) =>
+        round.id !== currentRound.id &&
+        round.status === 'complete' &&
+        (round.playedOn < currentRound.playedOn ||
+          (round.playedOn === currentRound.playedOn &&
+            round.createdAt < currentRound.createdAt)),
+    )
+    .flatMap((round) => {
+      const sameCourse =
+        currentRound.courseId &&
+        currentRound.teeId &&
+        round.courseId &&
+        round.teeId
+          ? currentRound.courseId === round.courseId &&
+            currentRound.teeId === round.teeId
+          : currentCourseIdentities.has(
+              courseKey(
+                round.courseName,
+                round.teeName?.trim() || 'Unspecified tees',
+              ),
+            )
+
+      return round.holes.flatMap((hole) =>
+        hole.shots.flatMap((shot, historicalShotIndex) => {
+          const clubName = shot.club?.trim()
+          const availableClub = clubName
+            ? availableByName.get(clubName.toLocaleLowerCase('en-US'))
+            : undefined
+          if (
+            !availableClub ||
+            shot.start.unit !== start.unit ||
+            shotCategory(shot, historicalShotIndex, hole.par) !==
+              targetCategory
+          ) {
+            return []
+          }
+
+          const distanceDifference = Math.abs(
+            shot.start.distance - start.distance,
+          )
+          if (distanceDifference > tolerance) return []
+
+          const sameLie = shot.start.lie === start.lie
+          const sameHole = sameCourse && hole.number === currentHole.number
+          const tier = sameHole && sameLie
+            ? 0
+            : sameCourse && sameLie
+              ? 1
+              : sameCourse
+                ? 2
+                : sameLie
+                  ? 3
+                  : 4
+
+          return [{
+            club: availableClub,
+            distanceDifference,
+            playedOn: round.playedOn,
+            tier,
+          }]
+        }),
+      )
+    })
+
+  if (candidates.length === 0) return fallback
+  const bestTier = Math.min(...candidates.map((candidate) => candidate.tier))
+  const scores = new Map<
+    string,
+    { club: string; score: number; latestPlayedOn: string }
+  >()
+  for (const candidate of candidates.filter(
+    (candidate) => candidate.tier === bestTier,
+  )) {
+    const key = candidate.club.toLocaleLowerCase('en-US')
+    const current = scores.get(key) ?? {
+      club: candidate.club,
+      score: 0,
+      latestPlayedOn: candidate.playedOn,
+    }
+    current.score +=
+      1 + (tolerance - candidate.distanceDifference) / tolerance
+    if (candidate.playedOn > current.latestPlayedOn) {
+      current.latestPlayedOn = candidate.playedOn
+      current.club = candidate.club
+    }
+    scores.set(key, current)
+  }
+
+  return [...scores.values()].sort(
+    (a, b) =>
+      b.score - a.score ||
+      b.latestPlayedOn.localeCompare(a.latestPlayedOn) ||
+      a.club.localeCompare(b.club),
+  )[0]?.club ?? fallback
+}
+
 export function defaultDistanceEntry(start: Position, finishLie: Lie): number {
   if (start.lie === 'green') return 2
   return finishLie === 'green' ? 10 : 100

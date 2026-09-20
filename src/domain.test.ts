@@ -17,6 +17,7 @@ import {
   holeStrokeExpectations,
   isIronClub,
   mergeCourseTemplates,
+  suggestedClub,
   type Round,
   type Shot,
 } from './domain'
@@ -183,6 +184,97 @@ describe('default club', () => {
     expect(isIronClub('Utility iron')).toBe(true)
     expect(isIronClub('Pitching wedge')).toBe(true)
     expect(isIronClub('58 wedge')).toBe(false)
+  })
+
+  it('prefers clubs used from similar positions on the same course and hole', () => {
+    const priorRound = makeRound('prior', '2026-01-01', 400)
+    priorRound.holes[0].shots[0].club = '3 wood'
+    const currentRound = makeRound('current', '2026-02-01', 400)
+    currentRound.status = 'draft'
+    currentRound.holes[0].shots = []
+
+    expect(
+      suggestedClub(
+        [priorRound, currentRound],
+        currentRound,
+        currentRound.holes[0],
+        0,
+        { lie: 'tee', distance: 400, unit: 'yards' },
+        CLUB_OPTIONS,
+      ),
+    ).toBe('3 wood')
+  })
+
+  it('uses similar-distance history across courses and otherwise keeps the fallback', () => {
+    const priorRound = makeRound('prior', '2026-01-01', 400)
+    priorRound.courseName = 'Another course'
+    priorRound.holes[0].shots = [
+      {
+        id: 'approach',
+        start: { lie: 'fairway', distance: 155, unit: 'yards' },
+        finish: { lie: 'green', distance: 20, unit: 'feet' },
+        penaltyStrokes: 0,
+        club: '6 iron',
+      },
+    ]
+    const currentRound = makeRound('current', '2026-02-01', 400)
+    currentRound.status = 'draft'
+    const currentHole = { ...currentRound.holes[0], shots: [] }
+
+    expect(
+      suggestedClub(
+        [priorRound],
+        currentRound,
+        currentHole,
+        1,
+        { lie: 'fairway', distance: 150, unit: 'yards' },
+        CLUB_OPTIONS,
+      ),
+    ).toBe('6 iron')
+    expect(
+      suggestedClub(
+        [],
+        currentRound,
+        currentHole,
+        1,
+        { lie: 'fairway', distance: 150, unit: 'yards' },
+        CLUB_OPTIONS,
+      ),
+    ).toBe('7 iron')
+  })
+
+  it('ignores future rounds and recognizes renamed-course aliases', () => {
+    const futureRound = makeRound('future', '2026-03-01', 400)
+    futureRound.holes[0].shots[0].club = '3 wood'
+    const renamedRound = makeRound('renamed', '2026-01-01', 400)
+    renamedRound.courseName = 'Old course name'
+    renamedRound.holes[0].shots[0].club = '5 wood'
+    const currentRound = makeRound('current', '2026-02-01', 400)
+    currentRound.courseName = 'New course name'
+    currentRound.status = 'draft'
+    currentRound.holes[0].shots = []
+
+    expect(
+      suggestedClub(
+        [futureRound],
+        currentRound,
+        currentRound.holes[0],
+        0,
+        { lie: 'tee', distance: 400, unit: 'yards' },
+        CLUB_OPTIONS,
+      ),
+    ).toBe('Driver')
+    expect(
+      suggestedClub(
+        [futureRound, renamedRound],
+        currentRound,
+        currentRound.holes[0],
+        0,
+        { lie: 'tee', distance: 400, unit: 'yards' },
+        CLUB_OPTIONS,
+        ['old course name::unspecified tees'],
+      ),
+    ).toBe('5 wood')
   })
 })
 
