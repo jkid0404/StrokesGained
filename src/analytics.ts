@@ -97,6 +97,7 @@ export function buildStrokesGainedSummary(
   const categories = {
     'off-the-tee': categorySeed(),
     approach: categorySeed(),
+    recovery: categorySeed(),
     'around-the-green': categorySeed(),
     putting: categorySeed(),
   } satisfies Record<

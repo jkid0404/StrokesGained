@@ -181,6 +181,7 @@ function calculateHoleStrokesGained(hole: Hole): {
   const categories = {
     'off-the-tee': { total: 0, shots: 0 },
     approach: { total: 0, shots: 0 },
+    recovery: { total: 0, shots: 0 },
     'around-the-green': { total: 0, shots: 0 },
     putting: { total: 0, shots: 0 },
   } satisfies Record<ShotCategory, { total: number; shots: number }>
@@ -212,6 +213,7 @@ function categoryRecord<T>(value: T): Record<ShotCategory, T> {
   return {
     'off-the-tee': value,
     approach: value,
+    recovery: value,
     'around-the-green': value,
     putting: value,
   }

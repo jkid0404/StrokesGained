@@ -704,7 +704,7 @@ nav {
 .strokes-gained-summary-grid {
   border-top: 1px solid var(--line);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
 }
 
 .strokes-gained-summary-metric {
@@ -1383,7 +1383,7 @@ textarea:focus {
 }
 
 .course-hole-table {
-  min-width: 1280px;
+  min-width: 1362px;
 }
 
 .course-hole-row {
@@ -1392,7 +1392,7 @@ textarea:focus {
   border-top: 1px solid var(--line);
   display: grid;
   gap: 14px;
-  grid-template-columns: 70px 90px repeat(11, minmax(82px, 1fr));
+  grid-template-columns: 70px 90px repeat(12, minmax(82px, 1fr));
   padding: 14px 22px;
 }
 
@@ -1547,7 +1547,7 @@ textarea:focus {
 .live-category-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   margin: -8px 0 24px;
 }
 

@@ -15,6 +15,7 @@ export type Lie =
 export type ShotCategory =
   | 'off-the-tee'
   | 'approach'
+  | 'recovery'
   | 'around-the-green'
   | 'putting'
 
@@ -133,7 +134,8 @@ export interface CumulativeMetrics {
   personalRoundCount: number
 }
 
-export const BENCHMARK_VERSION = 'kaggle-evancallaghan-v1-2023'
+export const BENCHMARK_VERSION =
+  'kaggle-evancallaghan-v1-plus-broadie-recovery-v2-2026'
 
 export const CLUB_OPTIONS = [
   'Driver',
@@ -237,23 +239,20 @@ export const LIE_LABELS: Record<Lie, string> = {
   holed: 'Holed',
 }
 
-type SupportedBenchmarkLie = Exclude<Lie, 'holed' | 'recovery'>
+type SupportedBenchmarkLie = Exclude<Lie, 'holed'>
 
 const BENCHMARKS: Record<SupportedBenchmarkLie, BaselineAnchor[]> = KAGGLE_BASELINES
 
 export function benchmarkRange(lie: Lie): string {
   if (lie === 'holed') return '0'
-  if (lie === 'recovery') return 'unsupported'
   const anchors = BENCHMARKS[lie]
   const unit = lie === 'green' ? 'ft' : 'yd'
-  return `${anchors[0].distance}-${anchors.at(-1)!.distance} ${unit}`
+  const range = `${anchors[0].distance}-${anchors.at(-1)!.distance} ${unit}`
+  return lie === 'recovery' ? `${range}; nearest value used outside range` : range
 }
 
 export function expectedStrokes(position: Position): number {
   if (position.lie === 'holed') return 0
-  if (position.lie === 'recovery') {
-    throw new Error('Recovery shots are not supported by the active benchmark.')
-  }
 
   const expectedUnit = position.lie === 'green' ? 'feet' : 'yards'
   if (position.unit !== expectedUnit) {
@@ -263,6 +262,10 @@ export function expectedStrokes(position: Position): number {
   const anchors = BENCHMARKS[position.lie]
   const first = anchors[0]
   const last = anchors.at(-1)!
+  if (position.lie === 'recovery') {
+    if (position.distance <= first.distance) return first.expected
+    if (position.distance >= last.distance) return last.expected
+  }
   if (position.distance < first.distance || position.distance > last.distance) {
     throw new Error(
       `${LIE_LABELS[position.lie]} supports ${benchmarkRange(position.lie)} in the active benchmark.`,
@@ -282,6 +285,7 @@ export function expectedStrokes(position: Position): number {
 export function shotCategory(shot: Shot, shotIndex: number, par: number): ShotCategory {
   if (shot.start.lie === 'green') return 'putting'
   if (shotIndex === 0 && shot.start.lie === 'tee' && par >= 4) return 'off-the-tee'
+  if (shot.start.lie === 'recovery') return 'recovery'
   if (shot.start.distance <= 30) return 'around-the-green'
   return 'approach'
 }
@@ -293,6 +297,7 @@ export function defaultFinishLie(
   mostRecentlySelectedLie: Lie,
 ): Lie {
   if (start.lie === 'green') return start.distance <= 8 ? 'holed' : 'green'
+  if (start.lie === 'recovery') return 'fairway'
   if (start.lie === 'tee') return par === 3 ? 'green' : 'fairway'
   if ((par === 4 || par === 5) && shotIndex === 1) return 'green'
   return mostRecentlySelectedLie
@@ -376,6 +381,7 @@ export function calculateRound(round: Round): RoundMetrics {
   const categories: RoundMetrics['categories'] = {
     'off-the-tee': categorySeed(),
     approach: categorySeed(),
+    recovery: categorySeed(),
     'around-the-green': categorySeed(),
     putting: categorySeed(),
   }

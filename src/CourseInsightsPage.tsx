@@ -90,6 +90,7 @@ export function CourseInsightsPage({
                   <span>Avg SG</span>
                   <span>SG: Tee</span>
                   <span>SG: Approach</span>
+                  <span>SG: Recovery</span>
                   <span>SG: Short</span>
                   <span>SG: Putting</span>
                   <span>Fairway</span>
@@ -123,6 +124,7 @@ export function CourseInsightsPage({
                     </strong>
                     <CategoryMetric value={hole.strokesGainedCategories['off-the-tee']} />
                     <CategoryMetric value={hole.strokesGainedCategories.approach} />
+                    <CategoryMetric value={hole.strokesGainedCategories.recovery} />
                     <CategoryMetric
                       value={hole.strokesGainedCategories['around-the-green']}
                     />

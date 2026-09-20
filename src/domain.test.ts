@@ -23,13 +23,18 @@ import {
 
 describe('Kaggle benchmark', () => {
   it('returns values from the imported shot and putting tables', () => {
-    expect(BENCHMARK_VERSION).toBe('kaggle-evancallaghan-v1-2023')
+    expect(BENCHMARK_VERSION).toBe(
+      'kaggle-evancallaghan-v1-plus-broadie-recovery-v2-2026',
+    )
     expect(expectedStrokes({ lie: 'fairway', distance: 3, unit: 'yards' })).toBe(2)
     expect(expectedStrokes({ lie: 'fairway', distance: 100, unit: 'yards' })).toBe(2.8)
     expect(expectedStrokes({ lie: 'sand', distance: 20, unit: 'yards' })).toBe(2.53)
     expect(expectedStrokes({ lie: 'green', distance: 8, unit: 'feet' })).toBe(1.5)
     expect(expectedStrokes({ lie: 'tee', distance: 600, unit: 'yards' })).toBe(4.82)
     expect(expectedStrokes({ lie: 'green', distance: 90, unit: 'feet' })).toBe(2.4)
+    expect(expectedStrokes({ lie: 'recovery', distance: 100, unit: 'yards' })).toBe(
+      3.8,
+    )
   })
 
   describe('hole sequence', () => {
@@ -64,9 +69,8 @@ describe('Kaggle benchmark', () => {
     expect(() => expectedStrokes({ lie: 'fairway', distance: 601, unit: 'yards' })).toThrow(
       'supports 3-600 yd',
     )
-    expect(() => expectedStrokes({ lie: 'recovery', distance: 100, unit: 'yards' })).toThrow(
-      'Recovery shots are not supported',
-    )
+    expect(expectedStrokes({ lie: 'recovery', distance: 50, unit: 'yards' })).toBe(3.8)
+    expect(expectedStrokes({ lie: 'recovery', distance: 350, unit: 'yards' })).toBe(4.2)
   })
 })
 
@@ -80,6 +84,26 @@ describe('strokes gained calculations', () => {
     }
 
     expect(calculateShot(shot, 1, 4).strokesGained).toBeCloseTo(-0.7)
+  })
+
+  it('charges a tee shot for finishing in recovery and separates the pitch-out', () => {
+    const drive: Shot = {
+      id: 'drive',
+      start: { lie: 'tee', distance: 400, unit: 'yards' },
+      finish: { lie: 'recovery', distance: 180, unit: 'yards' },
+      penaltyStrokes: 0,
+    }
+    const pitchOut: Shot = {
+      id: 'pitch-out',
+      start: drive.finish,
+      finish: { lie: 'fairway', distance: 140, unit: 'yards' },
+      penaltyStrokes: 0,
+    }
+
+    expect(calculateShot(drive, 0, 4).strokesGained).toBeCloseTo(-0.83)
+    const pitchOutResult = calculateShot(pitchOut, 1, 4)
+    expect(pitchOutResult.category).toBe('recovery')
+    expect(pitchOutResult.strokesGained).toBeCloseTo(-0.09)
   })
 
   it('marks a round unsupported when any shot is outside benchmark coverage', () => {
@@ -103,6 +127,14 @@ describe('default finishing lie', () => {
     expect(defaultFinishLie(5, 0, tee, 'sand')).toBe('fairway')
     expect(defaultFinishLie(4, 1, fairway, 'rough')).toBe('green')
     expect(defaultFinishLie(5, 1, fairway, 'sand')).toBe('green')
+    expect(
+      defaultFinishLie(
+        4,
+        1,
+        { lie: 'recovery', distance: 180, unit: 'yards' },
+        'rough',
+      ),
+    ).toBe('fairway')
   })
 
   it('uses distance from the green and otherwise remembers the manual selection', () => {

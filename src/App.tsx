@@ -70,11 +70,19 @@ type View =
 const CATEGORY_LABELS: Record<ShotCategory, string> = {
   'off-the-tee': 'Off the tee',
   approach: 'Approach',
+  recovery: 'Recovery',
   'around-the-green': 'Around green',
   putting: 'Putting',
 }
 
-const PLAYABLE_LIES: Lie[] = ['fairway', 'rough', 'sand', 'green', 'holed']
+const PLAYABLE_LIES: Lie[] = [
+  'fairway',
+  'rough',
+  'recovery',
+  'sand',
+  'green',
+  'holed',
+]
 
 function calculateHoleStrokesGained(hole: Hole): number | null {
   if (hole.shots.at(-1)?.finish.lie !== 'holed') return null

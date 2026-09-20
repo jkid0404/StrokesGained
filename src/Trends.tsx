@@ -27,6 +27,7 @@ import { StrokesGainedSummary } from './StrokesGainedSummary'
 const CATEGORY_LABELS: Record<ShotCategory, string> = {
   'off-the-tee': 'Off the tee',
   approach: 'Approach',
+  recovery: 'Recovery',
   'around-the-green': 'Around the green',
   putting: 'Putting',
 }
