@@ -87,6 +87,31 @@ describe('strokes gained calculations', () => {
     expect(calculateShot(shot, 1, 4).strokesGained).toBeCloseTo(-0.7)
   })
 
+  it('counts a stroke-and-distance replay from the tee as off the tee', () => {
+    const penalizedShot: Shot = {
+      id: 'out-of-bounds',
+      start: { lie: 'tee', distance: 400, unit: 'yards' },
+      finish: { lie: 'tee', distance: 400, unit: 'yards' },
+      penaltyStrokes: 1,
+    }
+    const replay: Shot = {
+      id: 'replay',
+      start: penalizedShot.finish,
+      finish: { lie: 'fairway', distance: 150, unit: 'yards' },
+      penaltyStrokes: 0,
+    }
+
+    expect(calculateShot(penalizedShot, 0, 4)).toMatchObject({
+      category: 'off-the-tee',
+      strokesGained: -2,
+    })
+    expect(calculateShot(replay, 1, 4).category).toBe('off-the-tee')
+    expect(defaultClub(4, 1, replay.start)).toBe('Driver')
+    expect(defaultClub(3, 1, { lie: 'tee', distance: 150, unit: 'yards' })).toBe(
+      '7 iron',
+    )
+  })
+
   it('charges a tee shot for finishing in recovery and separates the pitch-out', () => {
     const drive: Shot = {
       id: 'drive',
@@ -148,6 +173,9 @@ describe('default finishing lie', () => {
     expect(
       defaultFinishLie(5, 2, { lie: 'rough', distance: 80, unit: 'yards' }, 'sand'),
     ).toBe('sand')
+    expect(
+      defaultFinishLie(4, 2, { lie: 'fairway', distance: 150, unit: 'yards' }, 'tee'),
+    ).toBe('fairway')
   })
 })
 

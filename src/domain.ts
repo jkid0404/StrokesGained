@@ -282,9 +282,9 @@ export function expectedStrokes(position: Position): number {
   return lower.expected + progress * (upper.expected - lower.expected)
 }
 
-export function shotCategory(shot: Shot, shotIndex: number, par: number): ShotCategory {
+export function shotCategory(shot: Shot, _shotIndex: number, par: number): ShotCategory {
   if (shot.start.lie === 'green') return 'putting'
-  if (shotIndex === 0 && shot.start.lie === 'tee' && par >= 4) return 'off-the-tee'
+  if (shot.start.lie === 'tee' && par >= 4) return 'off-the-tee'
   if (shot.start.lie === 'recovery') return 'recovery'
   if (shot.start.distance <= 30) return 'around-the-green'
   return 'approach'
@@ -300,7 +300,9 @@ export function defaultFinishLie(
   if (start.lie === 'recovery') return 'fairway'
   if (start.lie === 'tee') return par === 3 ? 'green' : 'fairway'
   if ((par === 4 || par === 5) && shotIndex === 1) return 'green'
-  return mostRecentlySelectedLie
+  return mostRecentlySelectedLie === 'tee'
+    ? 'fairway'
+    : mostRecentlySelectedLie
 }
 
 export function defaultClub(
@@ -309,7 +311,7 @@ export function defaultClub(
   start: Position,
 ): string {
   if (start.lie === 'green') return 'Putter'
-  if (shotIndex === 0 && start.lie === 'tee') {
+  if (start.lie === 'tee') {
     return par >= 4 ? 'Driver' : '7 iron'
   }
   if (shotIndex === 1 && par === 4) return '7 iron'

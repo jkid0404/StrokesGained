@@ -77,6 +77,7 @@ const CATEGORY_LABELS: Record<ShotCategory, string> = {
 }
 
 const PLAYABLE_LIES: Lie[] = [
+  'tee',
   'fairway',
   'rough',
   'recovery',
@@ -1394,14 +1395,17 @@ function RoundEntry({
       ...hole,
       par,
       yardage,
-      shots: hole.shots.map((shot, shotIndex) =>
-        shotIndex === 0 && shot.start.lie === 'tee'
-          ? {
-              ...shot,
-              start: { ...shot.start, distance: yardage, unit: 'yards' as const },
-            }
-          : shot,
-      ),
+      shots: hole.shots.map((shot) => ({
+        ...shot,
+        start:
+          shot.start.lie === 'tee'
+            ? { ...shot.start, distance: yardage, unit: 'yards' as const }
+            : shot.start,
+        finish:
+          shot.finish.lie === 'tee'
+            ? { ...shot.finish, distance: yardage, unit: 'yards' as const }
+            : shot.finish,
+      })),
     }
     const updatedHoles = round.holes.map((item, index) =>
       index === activeHoleIndex ? updatedHole : item,
@@ -1680,6 +1684,7 @@ function RoundEntry({
                         par={hole.par}
                         shot={shot}
                         shotIndex={index}
+                        yardage={hole.yardage}
                       />
                     )}
                   </Fragment>
@@ -1743,9 +1748,13 @@ function RoundEntry({
                     type="button"
                     key={lie}
                     onClick={() => {
-                      mostRecentFinishLie.current = lie
+                      if (lie !== 'tee') {
+                        mostRecentFinishLie.current = lie
+                      }
                       setFinishLie(lie)
-                      if (lie === 'green') {
+                      if (lie === 'tee') {
+                        setDistance(String(hole.yardage))
+                      } else if (lie === 'green') {
                         setDistance('10')
                       }
                     }}
@@ -2210,6 +2219,7 @@ function ShotEditor({
   clubs,
   shotIndex,
   par,
+  yardage,
   isLast,
   onSave,
   onCancel,
@@ -2218,6 +2228,7 @@ function ShotEditor({
   clubs: string[]
   shotIndex: number
   par: number
+  yardage: number
   isLast: boolean
   onSave: (shot: Shot) => void
   onCancel: () => void
@@ -2280,7 +2291,9 @@ function ShotEditor({
             onChange={(event) => {
               const lie = event.target.value as Lie
               setFinishLie(lie)
-              if (lie === 'green') {
+              if (lie === 'tee') {
+                setDistance(String(yardage))
+              } else if (lie === 'green') {
                 setDistance('10')
               } else if (lie !== 'holed' && distance === '') {
                 setDistance(String(defaultDistanceEntry(shot.start, lie)))
