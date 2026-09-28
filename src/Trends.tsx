@@ -336,6 +336,7 @@ export function Trends({
             showPgaReference={isStrokesGained}
             symmetric={canBeNegative}
             tickStep={isPercentage ? 20 : undefined}
+            zeroAtTop={selectedMetric === 'sg:total'}
             zeroBased={!canBeNegative}
           />
 
@@ -491,6 +492,7 @@ function TrendChart({
   showPgaReference = true,
   symmetric = false,
   tickStep,
+  zeroAtTop = false,
   zeroBased = false,
 }: {
   averageReference: number | null
@@ -504,13 +506,15 @@ function TrendChart({
   showPgaReference?: boolean
   symmetric?: boolean
   tickStep?: number
+  zeroAtTop?: boolean
   zeroBased?: boolean
 }) {
   const columnWidth = 14
-  const width = Math.max(680, points.length * columnWidth + 82)
-  const height = 330
-  const margin = { top: 28, right: 24, bottom: 58, left: 58 }
-  const plotWidth = width - margin.left - margin.right
+  const columnGap = 2
+  const columnPitch = columnWidth + columnGap
+  const width = Math.max(680, points.length * columnPitch + 82)
+  const height = 300
+  const margin = { top: 28, right: 24, bottom: 24, left: 58 }
   const plotHeight = height - margin.top - margin.bottom
   const availableValues = points.flatMap((point) =>
     point.value === null ? [] : [point.value],
@@ -541,16 +545,14 @@ function TrendChart({
   const scale = chartScale(rawMin, rawMax, {
     symmetric,
     tickStep,
+    zeroAtTop,
     zeroBased,
   })
   const { min, max, ticks } = scale
-  const clusterWidth = points.length * columnWidth
-  const clusterStart = margin.left + Math.max(0, (plotWidth - clusterWidth) / 2)
   const x = (index: number) =>
-    clusterStart + columnWidth * (index + 0.5)
+    margin.left + columnPitch * index + columnWidth / 2
   const y = (value: number) =>
     margin.top + ((max - value) / (max - min)) * plotHeight
-  const labelStep = Math.max(1, Math.ceil(42 / columnWidth))
 
   return (
     <div className="card trend-chart-card">
@@ -633,16 +635,6 @@ function TrendChart({
                   </title>
                 </rect>
               )}
-              {(index % labelStep === 0 || index === points.length - 1) && (
-                <text
-                  className="trend-axis-label x-axis"
-                  textAnchor="middle"
-                  x={x(index)}
-                  y={height - 25}
-                >
-                  {formatChartDate(point.round.playedOn)}
-                </text>
-              )}
             </g>
           ))}
         </svg>
@@ -657,13 +649,29 @@ function chartScale(
   {
     symmetric,
     tickStep,
+    zeroAtTop,
     zeroBased,
   }: {
     symmetric: boolean
     tickStep?: number
+    zeroAtTop: boolean
     zeroBased: boolean
   },
 ): { min: number; max: number; ticks: number[] } {
+  if (zeroAtTop && rawMax <= 0) {
+    const step = niceStep(Math.abs(rawMin) / 4)
+    const min = -Math.max(step, Math.ceil(Math.abs(rawMin) / step) * step)
+    const intervalCount = Math.round(Math.abs(min) / step)
+    return {
+      min,
+      max: 0,
+      ticks: Array.from(
+        { length: intervalCount + 1 },
+        (_, index) => normalizeTick(-index * step),
+      ),
+    }
+  }
+
   if (symmetric) {
     const step = niceStep(Math.max(Math.abs(rawMin), Math.abs(rawMax)) / 2)
     const max = step * 2
@@ -713,9 +721,4 @@ function niceStep(value: number): number {
 
 function normalizeTick(value: number): number {
   return Number(value.toPrecision(12))
-}
-
-function formatChartDate(value: string): string {
-  const [, month, day] = value.split('-')
-  return `${Number(month)}/${Number(day)}`
 }

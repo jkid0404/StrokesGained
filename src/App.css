@@ -930,10 +930,6 @@ nav {
   text-anchor: end;
 }
 
-.trend-axis-label.x-axis {
-  text-anchor: middle;
-}
-
 .trend-reference-line {
   fill: none;
   stroke-width: 2;
