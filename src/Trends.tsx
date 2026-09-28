@@ -164,6 +164,8 @@ export function Trends({
   const formatValue = isStrokesGained
     ? formatMetric
     : traditionalDefinition!.format
+  const canBeNegative =
+    isStrokesGained || selectedTraditionalMetric === 'score-to-par-per-18'
   const clubCategory = isStrokesGained ? sgCategory : 'total'
   const clubMetrics = buildClubAnalytics(
     displayedRounds,
@@ -320,6 +322,7 @@ export function Trends({
             }}
             points={points}
             showPgaReference={isStrokesGained}
+            zeroBased={!canBeNegative}
           />
 
           <StrokesGainedSummary
@@ -472,6 +475,7 @@ function TrendChart({
   pointClass = (value) => (value >= 0 ? 'positive' : 'negative'),
   points,
   showPgaReference = true,
+  zeroBased = false,
 }: {
   averageReference: number | null
   emptyMessage?: string
@@ -482,8 +486,9 @@ function TrendChart({
   pointClass?: (value: number) => 'positive' | 'negative' | 'neutral'
   points: TrendPoint[]
   showPgaReference?: boolean
+  zeroBased?: boolean
 }) {
-  const width = Math.max(840, points.length * 36 + 82)
+  const width = Math.max(680, points.length * 48 + 82)
   const height = 330
   const margin = { top: 28, right: 24, bottom: 58, left: 58 }
   const plotWidth = width - margin.left - margin.right
@@ -516,10 +521,10 @@ function TrendChart({
   const rawMax = Math.max(...scaleValues)
   const rawRange = rawMax - rawMin || 1
   const padding = Math.max(0.1, rawRange * 0.15)
-  const min = rawMin - padding
+  const min = zeroBased ? 0 : rawMin - padding
   const max = rawMax + padding
   const bandWidth = plotWidth / points.length
-  const barWidth = Math.min(24, Math.max(8, bandWidth * 0.64))
+  const barWidth = Math.min(56, Math.max(12, bandWidth * 0.78))
   const x = (index: number) => margin.left + bandWidth * (index + 0.5)
   const y = (value: number) =>
     margin.top + ((max - value) / (max - min)) * plotHeight
