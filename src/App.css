@@ -950,7 +950,7 @@ nav {
 }
 
 .trend-bar {
-  rx: 3px;
+  shape-rendering: crispEdges;
 }
 
 .trend-bar.positive {

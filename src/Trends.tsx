@@ -57,6 +57,15 @@ const TRADITIONAL_METRIC_GROUPS = [
   'Short game',
   'Putting',
 ] as const
+const PERCENTAGE_TREND_METRICS = new Set<TraditionalTrendMetric>([
+  'fairways',
+  'gir',
+  'scrambling',
+  'up-and-downs',
+  'sand-saves',
+  'one-putts',
+  'three-putts',
+])
 
 export function Trends({
   clubs,
@@ -166,6 +175,9 @@ export function Trends({
     : traditionalDefinition!.format
   const canBeNegative =
     isStrokesGained || selectedTraditionalMetric === 'score-to-par-per-18'
+  const isPercentage =
+    selectedTraditionalMetric !== null &&
+    PERCENTAGE_TREND_METRICS.has(selectedTraditionalMetric)
   const clubCategory = isStrokesGained ? sgCategory : 'total'
   const clubMetrics = buildClubAnalytics(
     displayedRounds,
@@ -322,6 +334,8 @@ export function Trends({
             }}
             points={points}
             showPgaReference={isStrokesGained}
+            symmetric={canBeNegative}
+            tickStep={isPercentage ? 20 : undefined}
             zeroBased={!canBeNegative}
           />
 
@@ -475,6 +489,8 @@ function TrendChart({
   pointClass = (value) => (value >= 0 ? 'positive' : 'negative'),
   points,
   showPgaReference = true,
+  symmetric = false,
+  tickStep,
   zeroBased = false,
 }: {
   averageReference: number | null
@@ -486,9 +502,12 @@ function TrendChart({
   pointClass?: (value: number) => 'positive' | 'negative' | 'neutral'
   points: TrendPoint[]
   showPgaReference?: boolean
+  symmetric?: boolean
+  tickStep?: number
   zeroBased?: boolean
 }) {
-  const width = Math.max(680, points.length * 48 + 82)
+  const columnWidth = 14
+  const width = Math.max(680, points.length * columnWidth + 82)
   const height = 330
   const margin = { top: 28, right: 24, bottom: 58, left: 58 }
   const plotWidth = width - margin.left - margin.right
@@ -519,17 +538,19 @@ function TrendChart({
   ]
   const rawMin = Math.min(...scaleValues)
   const rawMax = Math.max(...scaleValues)
-  const rawRange = rawMax - rawMin || 1
-  const padding = Math.max(0.1, rawRange * 0.15)
-  const min = zeroBased ? 0 : rawMin - padding
-  const max = rawMax + padding
-  const bandWidth = plotWidth / points.length
-  const barWidth = Math.min(56, Math.max(12, bandWidth * 0.78))
-  const x = (index: number) => margin.left + bandWidth * (index + 0.5)
+  const scale = chartScale(rawMin, rawMax, {
+    symmetric,
+    tickStep,
+    zeroBased,
+  })
+  const { min, max, ticks } = scale
+  const clusterWidth = points.length * columnWidth
+  const clusterStart = margin.left + Math.max(0, (plotWidth - clusterWidth) / 2)
+  const x = (index: number) =>
+    clusterStart + columnWidth * (index + 0.5)
   const y = (value: number) =>
     margin.top + ((max - value) / (max - min)) * plotHeight
-  const ticks = Array.from({ length: 5 }, (_, index) => max - ((max - min) * index) / 4)
-  const labelStep = Math.max(1, Math.ceil(points.length / 10))
+  const labelStep = Math.max(1, Math.ceil(42 / columnWidth))
 
   return (
     <div className="card trend-chart-card">
@@ -572,7 +593,7 @@ function TrendChart({
                 y2={y(tick)}
               />
               <text className="trend-axis-label" x={margin.left - 10} y={y(tick) + 4}>
-                {formatValue(tick)}
+                {tick === 0 ? (tickStep === 20 ? '0%' : '0') : formatValue(tick)}
               </text>
             </g>
           ))}
@@ -602,8 +623,8 @@ function TrendChart({
                 <rect
                   className={`trend-bar ${pointClass(point.value)}`}
                   height={Math.max(1, Math.abs(y(point.value) - y(0)))}
-                  width={barWidth}
-                  x={x(index) - barWidth / 2}
+                  width={columnWidth}
+                  x={x(index) - columnWidth / 2}
                   y={Math.min(y(point.value), y(0))}
                 >
                   <title>
@@ -628,6 +649,70 @@ function TrendChart({
       </div>
     </div>
   )
+}
+
+function chartScale(
+  rawMin: number,
+  rawMax: number,
+  {
+    symmetric,
+    tickStep,
+    zeroBased,
+  }: {
+    symmetric: boolean
+    tickStep?: number
+    zeroBased: boolean
+  },
+): { min: number; max: number; ticks: number[] } {
+  if (symmetric) {
+    const step = niceStep(Math.max(Math.abs(rawMin), Math.abs(rawMax)) / 2)
+    const max = step * 2
+    return {
+      min: -max,
+      max,
+      ticks: [max, step, 0, -step, -max],
+    }
+  }
+
+  if (zeroBased) {
+    const step = tickStep ?? niceStep(rawMax / 5)
+    const max = Math.max(step, Math.ceil(rawMax / step) * step)
+    const intervalCount = Math.round(max / step)
+    return {
+      min: 0,
+      max,
+      ticks: Array.from(
+        { length: intervalCount + 1 },
+        (_, index) => normalizeTick(max - index * step),
+      ),
+    }
+  }
+
+  const step = niceStep((rawMax - rawMin || 1) / 4)
+  const min = Math.floor(rawMin / step) * step
+  const max = Math.ceil(rawMax / step) * step
+  const intervalCount = Math.round((max - min) / step)
+  return {
+    min,
+    max,
+    ticks: Array.from(
+      { length: intervalCount + 1 },
+      (_, index) => normalizeTick(max - index * step),
+    ),
+  }
+}
+
+function niceStep(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 1
+  const magnitude = 10 ** Math.floor(Math.log10(value))
+  const normalized = value / magnitude
+  const multiplier =
+    normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10
+  return multiplier * magnitude
+}
+
+function normalizeTick(value: number): number {
+  return Number(value.toPrecision(12))
 }
 
 function formatChartDate(value: string): string {
