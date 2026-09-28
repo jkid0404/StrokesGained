@@ -295,6 +295,7 @@ export function Trends({
           </div>
 
           <TrendChart
+            averageReference={average}
             emptyMessage={
               isStrokesGained
                 ? undefined
@@ -309,10 +310,6 @@ export function Trends({
             }
             label={metricLabel}
             metricDetail={metricDetail}
-            personalReference={reference}
-            personalReferenceLabel={
-              isStrokesGained ? 'Your average' : 'Filtered average'
-            }
             pointClass={(value) => {
               if (isStrokesGained) return value >= 0 ? 'positive' : 'negative'
               if (reference === null) return 'neutral'
@@ -466,24 +463,22 @@ function TrendMetric({
 }
 
 function TrendChart({
+  averageReference,
   emptyMessage = 'These rounds do not contain supported shots for the selected metric.',
   formatValue = formatMetric,
   headerControl,
   label,
   metricDetail,
-  personalReference,
-  personalReferenceLabel = 'Your average',
   pointClass = (value) => (value >= 0 ? 'positive' : 'negative'),
   points,
   showPgaReference = true,
 }: {
+  averageReference: number | null
   emptyMessage?: string
   formatValue?: (value: number) => string
   headerControl?: ReactNode
   label: string
   metricDetail: string
-  personalReference: number | null
-  personalReferenceLabel?: string
   pointClass?: (value: number) => 'positive' | 'negative' | 'neutral'
   points: TrendPoint[]
   showPgaReference?: boolean
@@ -514,8 +509,8 @@ function TrendChart({
 
   const scaleValues = [
     ...availableValues,
-    ...(showPgaReference ? [0] : []),
-    ...(personalReference === null ? [] : [personalReference]),
+    0,
+    ...(averageReference === null ? [] : [averageReference]),
   ]
   const rawMin = Math.min(...scaleValues)
   const rawMax = Math.max(...scaleValues)
@@ -523,14 +518,12 @@ function TrendChart({
   const padding = Math.max(0.1, rawRange * 0.15)
   const min = rawMin - padding
   const max = rawMax + padding
-  const x = (index: number) =>
-    points.length === 1
-      ? margin.left + plotWidth / 2
-      : margin.left + (index / (points.length - 1)) * plotWidth
+  const bandWidth = plotWidth / points.length
+  const barWidth = Math.min(24, Math.max(8, bandWidth * 0.64))
+  const x = (index: number) => margin.left + bandWidth * (index + 0.5)
   const y = (value: number) =>
     margin.top + ((max - value) / (max - min)) * plotHeight
   const ticks = Array.from({ length: 5 }, (_, index) => max - ((max - min) * index) / 4)
-  const segments = buildLineSegments(points, x, y)
   const labelStep = Math.max(1, Math.ceil(points.length / 10))
 
   return (
@@ -545,12 +538,10 @@ function TrendChart({
           <div className="trend-legend" aria-label="Chart reference lines">
             <span className="trend-legend-series">Round</span>
             {showPgaReference && (
-              <span className="trend-legend-pga">PGA Tour</span>
+              <span className="trend-legend-pga">PGA Tour average</span>
             )}
-            {personalReference !== null && (
-              <span className="trend-legend-personal">
-                {personalReferenceLabel}
-              </span>
+            {averageReference !== null && (
+              <span className="trend-legend-average">Window average</span>
             )}
           </div>
         </div>
@@ -590,34 +581,31 @@ function TrendChart({
               y2={y(0)}
             />
           )}
-          {personalReference !== null && (
+          {averageReference !== null && (
             <line
-              className="trend-reference-line personal"
+              className="trend-reference-line average"
               x1={margin.left}
               x2={width - margin.right}
-              y1={y(personalReference)}
-              y2={y(personalReference)}
+              y1={y(averageReference)}
+              y2={y(averageReference)}
             />
           )}
-
-          {segments.map((segment, index) => (
-            <polyline className="trend-series-line" key={index} points={segment} />
-          ))}
 
           {points.map((point, index) => (
             <g key={point.round.id}>
               {point.value !== null && (
-                <circle
-                  className={`trend-point ${pointClass(point.value)}`}
-                  cx={x(index)}
-                  cy={y(point.value)}
-                  r="5"
+                <rect
+                  className={`trend-bar ${pointClass(point.value)}`}
+                  height={Math.max(1, Math.abs(y(point.value) - y(0)))}
+                  width={barWidth}
+                  x={x(index) - barWidth / 2}
+                  y={Math.min(y(point.value), y(0))}
                 >
                   <title>
                     {point.round.courseName}, {point.round.playedOn}:{' '}
                     {formatValue(point.value)}
                   </title>
-                </circle>
+                </rect>
               )}
               {(index % labelStep === 0 || index === points.length - 1) && (
                 <text
@@ -635,26 +623,6 @@ function TrendChart({
       </div>
     </div>
   )
-}
-
-function buildLineSegments(
-  points: TrendPoint[],
-  x: (index: number) => number,
-  y: (value: number) => number,
-): string[] {
-  const segments: string[] = []
-  let current: string[] = []
-
-  points.forEach((point, index) => {
-    if (point.value === null) {
-      if (current.length) segments.push(current.join(' '))
-      current = []
-      return
-    }
-    current.push(`${x(index)},${y(point.value)}`)
-  })
-  if (current.length) segments.push(current.join(' '))
-  return segments
 }
 
 function formatChartDate(value: string): string {

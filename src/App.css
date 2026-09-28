@@ -398,7 +398,7 @@ nav {
 .hero-metric-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr;
 }
 
 .hero-stat {
@@ -905,7 +905,7 @@ nav {
   border-top: 2px dashed #708078;
 }
 
-.trend-legend-personal::before {
+.trend-legend-average::before {
   border-top: 2px dashed var(--gold);
 }
 
@@ -944,33 +944,24 @@ nav {
   stroke-dasharray: 7 6;
 }
 
-.trend-reference-line.personal {
+.trend-reference-line.average {
   stroke: var(--gold);
   stroke-dasharray: 4 5;
 }
 
-.trend-series-line {
-  fill: none;
-  stroke: var(--green);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 3;
+.trend-bar {
+  rx: 3px;
 }
 
-.trend-point {
-  stroke: white;
-  stroke-width: 2;
-}
-
-.trend-point.positive {
+.trend-bar.positive {
   fill: var(--green);
 }
 
-.trend-point.negative {
+.trend-bar.negative {
   fill: var(--red);
 }
 
-.trend-point.neutral {
+.trend-bar.neutral {
   fill: var(--green);
 }
 
@@ -2203,7 +2194,7 @@ button:disabled {
   }
 
   .hero-metric-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
   }
 
   .hero-card h1 {
