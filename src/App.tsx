@@ -2999,16 +2999,28 @@ function Results({
           {(Object.keys(metrics.categories) as ShotCategory[]).map((category) => {
             const metric = metrics.categories[category]
             const personal = baseline.categoryPerShot[category]
+            const personalDifference =
+              personal === undefined || !metric.shots
+                ? null
+                : metric.perShot - personal
             return (
               <div className="category-row" key={category}>
                 <strong>{CATEGORY_LABELS[category]}</strong>
                 <span className={metric.total >= 0 ? 'positive' : 'negative'}>
                   {formatMetric(metric.total)}
                 </span>
-                <span>
-                  {personal === undefined || !metric.shots
+                <span
+                  className={
+                    personalDifference === null
+                      ? undefined
+                      : personalDifference >= 0
+                        ? 'positive'
+                        : 'negative'
+                  }
+                >
+                  {personalDifference === null
                     ? 'N/A'
-                    : formatMetric(metric.perShot - personal)}
+                    : formatMetric(personalDifference)}
                 </span>
               </div>
             )

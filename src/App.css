@@ -676,7 +676,7 @@ nav {
 .trend-summary-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   margin: 24px 0;
 }
 

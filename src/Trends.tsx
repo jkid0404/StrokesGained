@@ -295,17 +295,6 @@ export function Trends({
               neutral={!isStrokesGained}
               value={best}
             />
-            <TrendMetric
-              detail={
-                isStrokesGained && reference === null
-                  ? 'Needs 5 eligible rounds'
-                  : metricDetail
-              }
-              formatValue={formatValue}
-              label={isStrokesGained ? 'Personal reference' : 'Filtered average'}
-              neutral={!isStrokesGained}
-              value={reference}
-            />
           </div>
 
           <TrendChart
