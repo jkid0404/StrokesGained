@@ -3002,7 +3002,7 @@ function Results({
             const personalDifference =
               personal === undefined || !metric.shots
                 ? null
-                : metric.perShot - personal
+                : (metric.perShot - personal) * metric.shots
             return (
               <div className="category-row" key={category}>
                 <strong>{CATEGORY_LABELS[category]}</strong>
