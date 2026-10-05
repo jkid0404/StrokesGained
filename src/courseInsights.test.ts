@@ -44,6 +44,8 @@ describe('course and hole insights', () => {
     expect(insights.holes[0]).toMatchObject({
       parLabel: '4–5',
       plays: 2,
+      birdiesOrBetter: { made: 2, opportunities: 2 },
+      bogeysOrWorse: { made: 0, opportunities: 2 },
       fairways: { made: 1, opportunities: 2 },
     })
   })
@@ -73,6 +75,25 @@ describe('course and hole insights', () => {
         0,
       ),
     ).toBeCloseTo(insights.holes[0].averageStrokesGained!)
+  })
+
+  it('tracks birdie-or-better and bogey-or-worse rates by hole', () => {
+    const rounds = [
+      makeRound('birdie', 'Alpha', 'Blue', '2026-01-01', [
+        makeHole(1, 4, 'fairway'),
+      ]),
+      makeRound('par', 'Alpha', 'Blue', '2026-01-02', [
+        makeHole(1, 4, 'fairway', 1),
+      ]),
+      makeRound('bogey', 'Alpha', 'Blue', '2026-01-03', [
+        makeHole(1, 4, 'fairway', 2),
+      ]),
+    ]
+
+    const [hole] = buildCourseInsights(rounds, course).holes
+
+    expect(hole.birdiesOrBetter).toEqual({ made: 1, opportunities: 3 })
+    expect(hole.bogeysOrWorse).toEqual({ made: 1, opportunities: 3 })
   })
 
   it('returns empty insight values when a course has no completed rounds', () => {

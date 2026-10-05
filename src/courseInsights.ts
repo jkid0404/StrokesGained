@@ -22,7 +22,8 @@ export interface CourseHoleInsight {
   parLabel: string
   plays: number
   averageScore: number
-  averageToPar: number
+  birdiesOrBetter: CountMetric
+  bogeysOrWorse: CountMetric
   averageStrokesGained: number | null
   strokesGainedCategories: Record<ShotCategory, number | null>
   fairways: CountMetric
@@ -46,7 +47,8 @@ interface HoleAccumulator {
   holeNumber: number
   pars: number[]
   scores: number[]
-  scoreToPar: number[]
+  birdiesOrBetter: CountMetric
+  bogeysOrWorse: CountMetric
   strokesGained: number[]
   strokesGainedCategoryTotals: Record<ShotCategory, number>
   fairways: CountMetric
@@ -74,7 +76,8 @@ export function buildCourseInsights(
         holeNumber: hole.number,
         pars: [],
         scores: [],
-        scoreToPar: [],
+        birdiesOrBetter: { made: 0, opportunities: 0 },
+        bogeysOrWorse: { made: 0, opportunities: 0 },
         strokesGained: [],
         strokesGainedCategoryTotals: categoryRecord(0),
         fairways: { made: 0, opportunities: 0 },
@@ -86,7 +89,10 @@ export function buildCourseInsights(
 
       group.pars.push(hole.par)
       group.scores.push(stats.totalStrokes)
-      group.scoreToPar.push(stats.scoreToPar)
+      group.birdiesOrBetter.opportunities += 1
+      group.bogeysOrWorse.opportunities += 1
+      if (stats.scoreToPar <= -1) group.birdiesOrBetter.made += 1
+      if (stats.scoreToPar >= 1) group.bogeysOrWorse.made += 1
       if (strokesGained !== null) {
         group.strokesGained.push(strokesGained.total)
         for (const category of Object.keys(
@@ -149,7 +155,8 @@ function toHoleInsight(group: HoleAccumulator): CourseHoleInsight {
         : `${uniquePars[0]}–${uniquePars.at(-1)}`,
     plays: group.scores.length,
     averageScore: mean(group.scores),
-    averageToPar: mean(group.scoreToPar),
+    birdiesOrBetter: group.birdiesOrBetter,
+    bogeysOrWorse: group.bogeysOrWorse,
     averageStrokesGained:
       group.strokesGained.length > 0 ? mean(group.strokesGained) : null,
     strokesGainedCategories: Object.fromEntries(

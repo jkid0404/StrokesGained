@@ -86,7 +86,8 @@ export function CourseInsightsPage({
                   <span>Hole</span>
                   <span>Plays</span>
                   <span>Avg score</span>
-                  <span>To par</span>
+                  <span>Birdie %</span>
+                  <span>Bogey %</span>
                   <span>Avg SG</span>
                   <span>SG: Tee</span>
                   <span>SG: Approach</span>
@@ -106,11 +107,8 @@ export function CourseInsightsPage({
                     </span>
                     <span>{hole.plays}</span>
                     <strong>{hole.averageScore.toFixed(2)}</strong>
-                    <strong
-                      className={hole.averageToPar <= 0 ? 'positive' : 'negative'}
-                    >
-                      {formatToPar(hole.averageToPar)}
-                    </strong>
+                    <strong>{formatCountMetric(hole.birdiesOrBetter)}</strong>
+                    <strong>{formatCountMetric(hole.bogeysOrWorse)}</strong>
                     <strong
                       className={
                         hole.averageStrokesGained === null
